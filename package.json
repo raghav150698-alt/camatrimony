@@ -1,0 +1,33 @@
+{
+  "name": "camatrimony-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "dev:api": "cd apps/api && wrangler dev",
+    "dev:web": "cd apps/web && next dev",
+    "dev:admin": "cd apps/admin && next dev",
+    "build:api": "cd apps/api && wrangler deploy --dry-run",
+    "build:web": "cd apps/web && next build",
+    "build:admin": "cd apps/admin && next build",
+    "deploy:api": "cd apps/api && wrangler deploy",
+    "deploy:web": "cd apps/web && pnpm run build && npx @cloudflare/next-on-pages && wrangler pages deploy",
+    "deploy:admin": "cd apps/admin && pnpm run build && npx @cloudflare/next-on-pages && wrangler pages deploy",
+    "db:migrate": "cd apps/api && pnpm exec wrangler d1 migrations apply camatrimony-db --remote",
+    "db:migrate-local": "cd apps/api && pnpm exec wrangler d1 migrations apply camatrimony-db --local",
+    "db:seed-local": "cd apps/api && pnpm exec wrangler d1 execute camatrimony-db --local --file=../../scripts/seed-local-matches.sql",
+    "db:seed-local-admin": "cd apps/api && pnpm exec wrangler d1 execute camatrimony-db --local --file=../../scripts/seed-local-admin.sql"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5"
+  }
+}

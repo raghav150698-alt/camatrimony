@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "camatrimony-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "camatrimony-db",
+      "database_id": "7d423a72-50a0-4f0e-916b-2dd21ec1b6b5",
+      "migrations_dir": "../../migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "camatrimony-uploads-bucket"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CORS_ORIGIN": "https://camatrimonybncn.com,https://admin.camatrimonybncn.com,https://camatrimony-web.pages.dev,https://camatrimony-admin.pages.dev,https://*.camatrimony-web.pages.dev,https://*.camatrimony-admin.pages.dev,http://localhost:3000,http://localhost:3001",
+    "FIREBASE_PROJECT_ID": "ca-matrimony-bncn",
+    "PUBLIC_API_BASE": "https://api.camatrimonybncn.com/v1"
+  }
+}

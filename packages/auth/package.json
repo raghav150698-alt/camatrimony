@@ -1,0 +1,28 @@
+{
+  "name": "@camatrimony/auth",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client/index.js",
+    "./server": "./dist/server/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@camatrimony/shared": "workspace:*",
+    "hono": "^4.6.0"
+  },
+  "peerDependencies": {
+    "firebase": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "firebase": "^12.13.0",
+    "typescript": "^5"
+  }
+}

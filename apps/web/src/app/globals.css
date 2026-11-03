@@ -1,0 +1,175 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+.match-workspace { color-scheme: light; }
+.match-workspace button, .match-workspace summary { cursor: pointer; }
+.match-workspace :focus-visible { outline: 2px solid #986448; outline-offset: 3px; }
+.match-label { display: block; font-size: 11px; font-weight: 600; color: #7b6b5b; }
+.match-input { width: 100%; border: 1px solid #e1d8cd; border-radius: 8px; padding: 10px 11px; background: #fffefa; color: #463a30; font-size: 12px; font-weight: 400; }
+.match-primary { min-height: 44px; border-radius: 8px; padding: 10px 14px; background: #73333e; color: #fffaf3; font-size: 12px; font-weight: 500; transition: background .2s; }
+.match-primary:hover { background: #58232e; }
+.match-workspace .match-card details[open] summary { margin-bottom: 8px; }
+
+/* Scan shared UI package so utilities like fixed/bottom/right on WhatsAppFAB are generated */
+@source "../../../../packages/ui/src";
+
+@theme {
+  --color-maroon-50: #faf5f5;
+  --color-maroon-100: #f5ebeb;
+  --color-maroon-200: #ecd7d7;
+  --color-maroon-300: #debab9;
+  --color-maroon-400: #cd9392;
+  --color-maroon-500: #73333e;
+  --color-maroon-600: #612733;
+  --color-maroon-700: #521313;
+  --color-maroon-800: #3e0e0e;
+  --color-maroon-900: #2a0909;
+
+  --color-gold-50: #fefcf3;
+  --color-gold-100: #fcf6df;
+  --color-gold-200: #f7eab4;
+  --color-gold-300: #f1db89;
+  --color-gold-400: #eccd5e;
+  --color-gold-500: #d4a843;
+  --color-gold-600: #b89136;
+  --color-gold-700: #9c7b2c;
+  --color-gold-800: #806522;
+  --color-gold-900: #644f19;
+
+  --font-sans: var(--font-plus-jakarta), var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+}
+
+:root {
+  --background: #faf8f5;
+  --foreground: #0f172a;
+}
+
+
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom Utilities and Keyframes */
+@layer utilities {
+  .glassmorphism {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .glassmorphism {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  .dark .glassmorphism {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .gold-gradient-text {
+    background: linear-gradient(135deg, #f1db89 0%, #d4a843 50%, #9c7b2c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .maroon-gradient {
+    background: linear-gradient(135deg, #7b1e1e 0%, #521313 100%);
+  }
+
+  .gold-gradient {
+    background: linear-gradient(135deg, #f1db89 0%, #d4a843 100%);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7b1e1e;
+}
+
+/* Base animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in,
+.animate-fadeIn {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

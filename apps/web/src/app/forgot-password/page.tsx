@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import Layout from "@/components/layout/Layout";
+export default function SignInHelp(){return <Layout><div className="site-container auth-layout"><div className="auth-story"><p className="site-eyebrow">SIGN-IN HELP</p><h1>Let’s get you<br/><em>back in.</em></h1><p>No password to remember. Just use the Google account or mobile number linked to your profile.</p></div><div className="auth-card"><ShieldCheck size={28} className="mb-5 text-[#a08459]"/><h2>A simple way back.</h2><p>Choose Google sign-in, or request a fresh OTP on your registered number. Still stuck? Our team can help.</p><Link href="/login" className="site-action w-full">Return to sign in<ArrowRight size={16}/></Link><Link href="/contact" className="site-action site-action-outline w-full mt-3">Contact support</Link></div></div></Layout>;}
