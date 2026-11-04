@@ -36,7 +36,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" data-scroll-behavior="smooth" className={`${plusJakartaSans.variable} ${inter.variable} h-full scroll-smooth`}>
       <body className="min-h-full flex flex-col font-sans antialiased bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />
-        {process.env.NEXT_PUBLIC_CLIENT_PREVIEW === "true" && <div className="client-preview-banner" role="note">Client preview · Fictional profiles · Payments and contact unlocks disabled</div>}
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

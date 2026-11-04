@@ -295,4 +295,3 @@ em { font-weight:inherit; }
 
 .profile-section-picker { display:none; }
 @media(max-width:800px) { .profile-section-nav { display:none; }.profile-section-picker { display:block; font-size:10px; letter-spacing:.5px; color:var(--muted); }.profile-section-picker select { display:block; width:100%; margin-top:9px; padding:13px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); font-size:13px; letter-spacing:0; } }
-.client-preview-banner { padding:9px 16px; background:#743642; color:#fff; text-align:center; font-size:11px; line-height:1.5; }
