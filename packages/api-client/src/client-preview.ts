@@ -1,4 +1,4 @@
-import { scorePreferenceMatch } from "@camatrimony/shared";
+import { scorePreferenceMatch, validateProfileAge, validateProfileDegree } from "@camatrimony/shared";
 
 // Fictional data only. This transport never calls the production API.
 const people = [
@@ -48,6 +48,9 @@ export async function clientPreviewResponse(method: string, path: string, body?:
   const disabled = () => ({ success: false, error: "This action is unavailable in the client preview. No live data has been changed." });
   if (p === "/profile") {
     if (method === "POST") {
+      const invalid = validateProfileAge(body?.age ?? s.profile.age, body?.gender ?? s.profile.gender)
+        || validateProfileDegree(body?.highestDegree ?? s.profile.highestDegree);
+      if (invalid) return { success: false, error: invalid };
       // Persist only editable synthetic biodata. No identity/contact/document input.
       for (const key of Object.keys(initialViewer)) {
         if (!["userId", "isVerified", "isOnboardingCompleted", "canViewPhotos"].includes(key) && body?.[key] !== undefined) s.profile[key] = body[key];

@@ -34,7 +34,6 @@ import {
   DIET_OPTIONS,
   MARITAL_STATUS_OPTIONS,
   RELIGION_OPTIONS,
-  HIGHEST_DEGREE_OPTIONS,
   EMPLOYED_IN_OPTIONS,
   ANNUAL_INCOME_OPTIONS,
   FAMILY_STATUS_OPTIONS,
@@ -46,6 +45,8 @@ import {
 } from "@camatrimony/shared";
 import { useAuth, DBUserProfile } from "@/context/AuthContext";
 import { uploadFile } from "@camatrimony/api-client";
+import DegreeField from "@/components/registration/DegreeField";
+import { minimumProfileAge, validateProfileAge, validateProfileDegree } from "@camatrimony/shared";
 
 export default function EditProfilePage() {
   const { user, dbUser, loading: authLoading, updateProfileData } = useAuth();
@@ -131,6 +132,12 @@ export default function EditProfilePage() {
 
   // Section Validation rules
   const validateSection = (section: string): boolean => {
+    const ageError = validateProfileAge(formData.age, formData.gender);
+    if (ageError) { addToast("error", "Check age", ageError); return false; }
+    if (section === "career") {
+      const degreeError = validateProfileDegree(formData.highestDegree);
+      if (degreeError) { addToast("error", "Check qualification", degreeError); return false; }
+    }
     if (section === "basic") {
       if (!formData.profileCreatedBy || !formData.gender || !formData.diet) {
         addToast("error", "Validation Failed", "Managed by, Gender, and Diet are required.");
@@ -426,6 +433,8 @@ export default function EditProfilePage() {
                     <Input
                       type="number"
                       label="Candidate Age (Yrs)"
+                      min={minimumProfileAge(formData.gender)} max={70} step={1}
+                      helperText={`Minimum age: ${minimumProfileAge(formData.gender)} years.`}
                       name="age"
                       value={formData.age}
                       onChange={handleChange}
@@ -645,16 +654,7 @@ export default function EditProfilePage() {
                 </CardHeader>
                 <CardBody className="space-y-6">
                   
-                  <Select
-                    name="highestDegree"
-                    label="Highest Qualification"
-                    labelStyle="wizard"
-                    fieldSize="compact"
-                    value={formData.highestDegree}
-                    onChange={handleChange}
-                    options={HIGHEST_DEGREE_OPTIONS}
-                    placeholder={false}
-                  />
+                  <DegreeField value={formData.highestDegree || ""} onChange={value => setFormData(prev => ({ ...prev, highestDegree: value }))} />
 
                   <div className="grid grid-cols-2 gap-4">
                     <Select

@@ -26,6 +26,17 @@
     "db:seed-local": "cd apps/api && pnpm exec wrangler d1 execute camatrimony-db --local --file=../../scripts/seed-local-matches.sql",
     "db:seed-local-admin": "cd apps/api && pnpm exec wrangler d1 execute camatrimony-db --local --file=../../scripts/seed-local-admin.sql"
   },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.32",
+      "sharp": "0.35.5",
+      "source-map-js": "1.2.2",
+      "@grpc/grpc-js": "1.14.7",
+      "nanoid@3": "3.3.18",
+      "browserslist": "4.28.7",
+      "baseline-browser-mapping": "2.11.0"
+    }
+  },
   "devDependencies": {
     "turbo": "^2.5.0",
     "typescript": "^5"

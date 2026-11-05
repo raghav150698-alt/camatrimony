@@ -18,6 +18,8 @@ import {
 import { useAuth, DBUserProfile } from "@/context/AuthContext";
 import { Button, Select } from "@camatrimony/ui";
 import { uploadFile } from "@camatrimony/api-client";
+import DegreeField from "@/components/registration/DegreeField";
+import { minimumProfileAge, validateProfileAge, validateProfileDegree } from "@camatrimony/shared";
 import {
   RASI_OPTIONS,
   NAKSHATRA_OPTIONS,
@@ -27,7 +29,6 @@ import {
   MARITAL_STATUS_OPTIONS,
   PHYSICAL_STATUS_OPTIONS,
   RELIGION_OPTIONS,
-  HIGHEST_DEGREE_OPTIONS,
   EMPLOYED_IN_OPTIONS,
   ANNUAL_INCOME_OPTIONS,
   FAMILY_STATUS_OPTIONS,
@@ -374,8 +375,8 @@ export default function ProfileWizard() {
         setStepError("Age and height are required.");
         return;
       }
-      if (age < 18 || age > 70) {
-        setStepError("Age must be between 18 and 70.");
+      if (validateProfileAge(formData.age, formData.gender)) {
+        setStepError(validateProfileAge(formData.age, formData.gender));
         return;
       }
       setFormData((prev) => ({
@@ -389,6 +390,8 @@ export default function ProfileWizard() {
       return;
     }
     if (currentStep === 5) {
+      const degreeError = validateProfileDegree(formData.highestDegree);
+      if (degreeError) { setStepError(degreeError); return; }
       // Coerce select defaults into state — controlled selects can look filled while value is ""
       const highestDegree = filled(formData.highestDegree)
         ? String(formData.highestDegree).trim()
@@ -454,6 +457,8 @@ export default function ProfileWizard() {
 
   const handleSubmit = async () => {
     if (submitting || pendingUploadField) return;
+    const invalid = validateProfileAge(formData.age, formData.gender) || validateProfileDegree(formData.highestDegree);
+    if (invalid) { setStepError(invalid); return; }
     setSubmitting(true);
     setStepError(null);
     try {
@@ -633,7 +638,10 @@ export default function ProfileWizard() {
                     <input
                       type="number"
                       name="age"
-                      min={18}
+                      min={minimumProfileAge(formData.gender)}
+                      step={1}
+                      aria-label="Age (years)"
+                      aria-describedby="minimum-profile-age"
                       max={70}
                       required
                       value={formData.age}
@@ -641,6 +649,7 @@ export default function ProfileWizard() {
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500/50"
                       placeholder="e.g. 26"
                     />
+                    <p id="minimum-profile-age" className="text-xs text-slate-500">Minimum age: {minimumProfileAge(formData.gender)} years.</p>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
@@ -910,18 +919,7 @@ export default function ProfileWizard() {
             {/* STEP 5: CAREER & INCOME */}
             {currentStep === 5 && (
               <div className="space-y-5 animate-fadeIn">
-                <Select
-                  id="highestDegree"
-                  name="highestDegree"
-                  label="Highest Qualification Degree"
-                  labelStyle="wizard"
-                  fieldSize="compact"
-                  required
-                  value={formData.highestDegree || "Chartered Accountant (CA)"}
-                  onChange={handleChange}
-                  options={HIGHEST_DEGREE_OPTIONS}
-                  placeholder={false}
-                />
+                <DegreeField value={formData.highestDegree || ""} onChange={value => setFormData(prev => ({ ...prev, highestDegree: value }))} />
 
                 <div className="grid grid-cols-2 gap-4">
                   <Select

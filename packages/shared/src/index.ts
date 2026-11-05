@@ -16,6 +16,7 @@ export * from "./constants/packages";
 export * from "./constants/astrology";
 export * from "./utils/matching";
 export * from "./utils/profile";
+export * from "./utils/profile-validation";
 export * from "./constants/profile-fields";
 export * from "./constants/search-filters";
 export * from "./constants/config";

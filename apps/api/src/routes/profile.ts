@@ -8,7 +8,7 @@ import {
   ensureUserRecord,
 } from "../lib";
 import { requireAuth } from "../middleware/auth";
-import { DEFAULT_API_BASE_URL } from "@camatrimony/shared";
+import { DEFAULT_API_BASE_URL, validateProfileAge, validateProfileDegree } from "@camatrimony/shared";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -254,7 +254,19 @@ app.post("/", requireAuth, async (c) => {
 
     const now = new Date().toISOString();
 
-    const age = Number(profileData.age);
+    const candidateAge = profileData.age ?? existing?.age;
+    const candidateGender = profileData.gender ?? existing?.gender;
+    if (candidateAge !== undefined && candidateAge !== null) {
+      const error = validateProfileAge(candidateAge, candidateGender);
+      if (error) return c.json({ success: false, error }, 400);
+    }
+    const degree = profileData.highestDegree ?? profileData.highest_degree;
+    if (degree !== undefined) {
+      const error = validateProfileDegree(degree);
+      if (error) return c.json({ success: false, error }, 400);
+      profileData.highestDegree = degree.trim();
+    }
+    const age = Number(candidateAge);
     const weight =
       profileData.weight === undefined || profileData.weight === null || profileData.weight === ""
         ? existing?.weight ?? null

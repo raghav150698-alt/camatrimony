@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@camatrimony/shared": "workspace:*",
-    "hono": "^4.6.0"
+    "hono": "4.13.16"
   },
   "peerDependencies": {
     "firebase": "^12.0.0"

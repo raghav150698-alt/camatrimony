@@ -225,7 +225,7 @@ function AdminSubscriptionsPageInner() {
   }, [packages, packagesLoading]);
 
   const openAssign = () => {
-    setAssignForm({ userId: "", packageId: "", validityDays: "" });
+    setAssignForm({ userId: "", packageId: "", startDate: todayDateInputValue(), validityDays: "" });
     setAssignError(null);
     setResolvedUser(null);
     setResolveNote(null);
