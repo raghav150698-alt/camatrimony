@@ -1,11 +1,8 @@
-# Local development secrets for the API Worker (api.camatrimonybncn.com)
-# Copy this file to .dev.vars and fill in the real values.
-# Production secrets should be set via `wrangler secret put` instead.
-
-FIREBASE_PROJECT_ID=...
-RAZORPAY_KEY_ID=...
-RAZORPAY_KEY_SECRET=...
-RAZORPAY_WEBHOOK_SECRET=...
-RESEND_API_KEY=...
-ADMIN_JWT_SECRET=...
-CORS_ORIGIN=https://camatrimonybncn.com,https://admin.camatrimonybncn.com
+ENVIRONMENT=development
+LOCAL_REVIEW_AUTH=false
+AUTH_PROVIDER=supabase
+SUPABASE_URL=https://ulwijnfaktabzhhvuvyv.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+# Set dedicated random values with wrangler secret put for production.
+ADMIN_JWT_SECRET=replace_for_local_development
+MEDIA_SIGNING_SECRET=replace_for_local_development

@@ -1,3 +1,4 @@
+import {signProfilePhotos} from "../services/media-access";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import { getAuthenticatedUser } from "../middleware/auth";
@@ -114,7 +115,7 @@ app.get("/", async (c) => {
 
     const apiBase = getPublicApiBase(c.env, c.req.url);
     let ranked = (rows.results || []).map((p: any) => ({
-      profile: mapPublicProfile(p, apiBase),
+      profile: mapPublicProfile(p, apiBase, !!currentUser),
       match: viewer ? scorePreferenceMatch(viewer, { ...p, annual_income: p.hide_income === 1 ? undefined : p.annual_income }) : undefined,
     }));
     // Rank the complete filtered pool before slicing, so page one contains the best fits.
@@ -126,7 +127,7 @@ app.get("/", async (c) => {
         || a.profile.userId.localeCompare(b.profile.userId));
       ranked = ranked.slice(offset, offset + limit);
     }
-    const formattedProfiles = ranked.map(({ profile, match }) => ({ ...profile, match }));
+    const formattedProfiles = await Promise.all(ranked.map(async ({profile,match}) => ({...await signProfilePhotos(profile,currentUserId,c.env,c.req.url),match})));
 
     return c.json({
       success: true,
@@ -225,7 +226,7 @@ app.get("/search-by-id", async (c) => {
 
     return c.json({
       success: true,
-      profile: (() => {
+      profile: await (async () => {
         const mapped = viewer
       ? mapMemberProfile(row, apiBase, canSeePhotos)
       : mapPublicProfile(row, apiBase);
@@ -237,7 +238,7 @@ app.get("/search-by-id", async (c) => {
         delete (mapped as any).address;
         if (row.hide_income === 1 && viewer?.id !== userId) mapped.annualIncome = "";
         if (row.photo_visibility === "private" && viewer?.id !== userId) mapped.photos = [];
-        return mapped;
+        return await signProfilePhotos(mapped,viewer?.id,c.env,c.req.url);
       })(),
     });
   } catch (err: any) {
@@ -287,7 +288,7 @@ app.get("/:id", async (c) => {
 
     return c.json({
       success: true,
-      profile: mapped,
+      profile: await signProfilePhotos(mapped,viewer?.id,c.env,c.req.url),
     });
   } catch (err: any) {
     return c.json({ error: err?.message || "Server Error" }, 500);

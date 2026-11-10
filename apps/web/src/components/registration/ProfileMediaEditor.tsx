@@ -26,7 +26,7 @@ export default function ProfileMediaEditor({ value, onChange, onUpload, uploadin
     try {
       const url = new URL(toAbsoluteMediaUrl(raw, apiBase), window.location.origin);
       // Never send the member token to a third-party document host.
-      if (url.origin !== new URL(apiBase).origin) throw new Error("Please upload this document again to preview it securely.");
+      if (url.origin !== new URL(apiBase, window.location.origin).origin) throw new Error("Please upload this document again to preview it securely.");
       const token = await getAuthToken();
       const response = await fetch(url.href, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!response.ok) throw new Error(response.status === 404 ? "This file is unavailable. Please upload it again." : "Could not open this document. Please try again.");

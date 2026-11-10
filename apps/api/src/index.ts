@@ -27,7 +27,7 @@ import storyRoutes from "./routes/stories";
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // Global middleware
-app.use("*", logger());
+app.use("*", logger(line=>console.log(line.replace(/\?[^\s]+/g,"?[redacted]"))));
 app.use("*", (c, next) => corsMiddleware(c.env)(c, next));
 
 // Health check

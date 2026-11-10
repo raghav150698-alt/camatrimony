@@ -12,7 +12,7 @@ const firebaseConfig = {
 
 // Check if credentials are stubs or missing (helps compile safely under build servers)
 const hasValidConfig =
-  firebaseConfig.apiKey &&
+  process.env.NEXT_PUBLIC_AUTH_PROVIDER !== "supabase" && firebaseConfig.apiKey &&
   !firebaseConfig.apiKey.includes("mock_key");
 
 // Initialize Firebase only when config is valid; otherwise use a null-safe fallback

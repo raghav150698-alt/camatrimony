@@ -1,3 +1,4 @@
+import {subscriptionView} from "../../services/subscriptions";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../../types";
 import { requireAdmin, requireSuperAdmin } from "../../middleware/auth";
@@ -83,7 +84,7 @@ app.get("/", requireAdmin, async (c) => {
                SELECT pk.name
                FROM user_subscriptions us
                LEFT JOIN packages pk ON us.package_id = pk.id
-               WHERE us.user_id = u.id AND us.status = 'active'
+               WHERE us.user_id = u.id AND us.status = 'active' AND julianday(us.start_date)<=julianday('now') AND julianday(us.end_date)>julianday('now')
                ORDER BY us.start_date DESC
                LIMIT 1
              ) as plan_name
@@ -295,7 +296,7 @@ app.get("/:id", requireAdmin, async (c) => {
     return c.json({
       success: true,
       profile: formattedProfile,
-      subscriptions: subscriptions.results || [],
+      subscriptions: (subscriptions.results || []).map((row:any)=>subscriptionView({...row,package_name:row.plan_name})),
       payments: formattedPayments,
       unlocks: unlocks.results || [],
       reports: reportsAgainst.results || [],
@@ -327,6 +328,8 @@ app.patch("/:id", requireAdmin, async (c) => {
       return c.json({ error: "User not found." }, 404);
     }
 
+    if(userRow.role!=='user' && admin.role!=='super_admin')return c.json({error:'Only a super administrator can change staff accounts.'},403);
+    if(userId===admin.id && role && role!=='super_admin')return c.json({error:'You cannot revoke your own administrator access.'},400);
     // 1. Check if modifying Roles (Requires Super Admin!)
     if (role && role !== userRow.role) {
       // Verify super admin permission
@@ -361,6 +364,12 @@ app.patch("/:id", requireAdmin, async (c) => {
         .run();
     }
 
+    if(role && admin.role==='super_admin'){
+      if(role==='user')await db.prepare(`UPDATE admin_accounts SET is_active=0 WHERE id=? OR supabase_subject IN
+        (SELECT subject FROM auth_identities WHERE provider='supabase' AND user_id=?)`).bind(userId,userId).run();
+      else await db.prepare(`UPDATE admin_accounts SET role=? WHERE id=? OR supabase_subject IN
+        (SELECT subject FROM auth_identities WHERE provider='supabase' AND user_id=?)`).bind(role,userId,userId).run();
+    }
     // 2. Perform regular updates
     const newStatus = status || userRow.status;
 

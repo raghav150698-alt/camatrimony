@@ -1,3 +1,4 @@
+import {photoViewer,maySeePhoto,photoReviewed} from "../services/media-access";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import { uploadToR2, generateR2Key, getPublicApiBase, ensureUserRecord, extractUploadKey, serveUploadObject } from "../lib";
@@ -54,6 +55,17 @@ app.get("/", async (c) => {
       return c.json({ error: "Missing object key parameter" }, 400);
     }
 
+    if(cleanKey.split('/')[1]==='photos') {
+      let viewer=await photoViewer(new URL(c.req.url),cleanKey,c.env);
+      if(!viewer && c.req.header('Authorization')) {
+        const {getAuthenticatedUser}=await import('../middleware/auth');
+        const member=await getAuthenticatedUser(c);if(member&&!member.isBanned)viewer=member.id;
+      }
+      if(!await maySeePhoto(c.env.DB,cleanKey.split('/')[0],viewer) || !await photoReviewed(c.env.DB,cleanKey,viewer)) {
+        const {getAdminUser}=await import('../middleware/auth');
+        if(!await getAdminUser(c))return c.json({error:'This photo is private or unavailable.'},403);
+      }
+    }
     if (isSensitiveUploadKey(cleanKey)) {
       const authHeader = c.req.header("Authorization") || "";
       let allowed = false;
@@ -62,8 +74,8 @@ app.get("/", async (c) => {
         try {
           const { getAuthenticatedUser, getAdminUser } = await import("../middleware/auth");
           const user = await getAuthenticatedUser(c);
-          if (user) {
-            const isOwner = cleanKey.includes(user.id);
+          if (user && !user.isBanned) {
+            const isOwner = cleanKey.startsWith(`${user.id}/`);
             const isAdmin = user.role !== "user";
             allowed = isOwner || isAdmin;
           }
@@ -89,7 +101,12 @@ app.get("/", async (c) => {
       }
     }
 
-    return await serveUploadObject(c.env, cleanKey);
+    const response = await serveUploadObject(c.env, cleanKey);
+    const headers = new Headers(response.headers);
+    headers.set('X-Content-Type-Options','nosniff');
+    headers.set('Cache-Control','private, no-store');
+    headers.set('Vary','Authorization, x-admin-token');
+    return new Response(response.body,{status:response.status,headers});
   } catch (err: any) {
     return c.json({ error: err?.message || "R2 Serve Error" }, 500);
   }

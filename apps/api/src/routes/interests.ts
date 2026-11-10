@@ -1,3 +1,4 @@
+import {signProfilePhotos} from "../services/media-access";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -6,16 +7,24 @@ import { sendTemplatedEmail, parsePhotos } from "../lib";
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // Intentionally omit users.email — contact PII is only via /v1/unlocks after balance spend.
-const INTEREST_SELECT_SENT = `SELECT i.*, p.gender, p.age, p.highest_degree, p.occupation, p.annual_income, p.work_location, p.photos, p.is_verified
+const INTEREST_SELECT_SENT = `SELECT i.*, p.full_name, p.gender, p.age, p.highest_degree, p.occupation, CASE WHEN privacy.hide_income=1 THEN NULL ELSE p.annual_income END AS annual_income, p.work_location, CASE WHEN privacy.photo_visibility IN ('private','premium') THEN '[]' ELSE p.photos END AS photos, p.is_verified
            FROM interest_requests i
            LEFT JOIN profiles p ON i.receiver_id = p.user_id
-           WHERE i.sender_id = ?
+           JOIN users u ON u.id=p.user_id
+           LEFT JOIN user_settings privacy ON privacy.user_id=p.user_id
+           WHERE i.sender_id = ? AND u.status='active' AND COALESCE(privacy.hide_profile,0)=0
+             AND NOT EXISTS (SELECT 1 FROM blocked_users b WHERE
+               (b.blocker_id=i.sender_id AND b.blocked_id=i.receiver_id) OR (b.blocker_id=i.receiver_id AND b.blocked_id=i.sender_id))
            ORDER BY i.created_at DESC`;
 
-const INTEREST_SELECT_RECEIVED = `SELECT i.*, p.gender, p.age, p.highest_degree, p.occupation, p.annual_income, p.work_location, p.photos, p.is_verified
+const INTEREST_SELECT_RECEIVED = `SELECT i.*, p.full_name, p.gender, p.age, p.highest_degree, p.occupation, CASE WHEN privacy.hide_income=1 THEN NULL ELSE p.annual_income END AS annual_income, p.work_location, CASE WHEN privacy.photo_visibility IN ('private','premium') THEN '[]' ELSE p.photos END AS photos, p.is_verified
            FROM interest_requests i
            LEFT JOIN profiles p ON i.sender_id = p.user_id
-           WHERE i.receiver_id = ?
+           JOIN users u ON u.id=p.user_id
+           LEFT JOIN user_settings privacy ON privacy.user_id=p.user_id
+           WHERE i.receiver_id = ? AND u.status='active' AND COALESCE(privacy.hide_profile,0)=0
+             AND NOT EXISTS (SELECT 1 FROM blocked_users b WHERE
+               (b.blocker_id=i.sender_id AND b.blocked_id=i.receiver_id) OR (b.blocker_id=i.receiver_id AND b.blocked_id=i.sender_id))
            ORDER BY i.created_at DESC`;
 
 // GET /v1/interests - List sent, received, or all interests
@@ -40,7 +49,7 @@ app.get("/", requireAuth, async (c) => {
       results = rows.results || [];
     }
 
-    const mapped = results.map((row: any) => ({ ...row, photos: parsePhotos(row.photos) }));
+    const mapped = await Promise.all(results.map((row:any)=>signProfilePhotos({...row,photos:parsePhotos(row.photos)},user.id,c.env,c.req.url)));
 
     return c.json({ success: true, interests: mapped });
   } catch (err: any) {
@@ -55,17 +64,18 @@ app.post("/", requireAuth, async (c) => {
   try {
     const { receiverId, message } = await c.req.json();
 
-    if (!receiverId) {
+    if (typeof receiverId !== "string" || !receiverId) {
       return c.json({ error: "Receiver User ID is required" }, 400);
     }
     if (receiverId === user.id) {
       return c.json({ error: "You cannot express interest in your own profile" }, 400);
     }
 
+    if(message != null && (typeof message !== 'string' || message.length > 1000))return c.json({error:'Keep your message within 1000 characters.'},400);
     const db = c.env.DB;
 
     const recipient = await db
-      .prepare("SELECT email FROM users WHERE id = ?")
+      .prepare("SELECT u.email FROM users u LEFT JOIN user_settings s ON s.user_id=u.id WHERE u.id = ? AND u.status='active' AND COALESCE(s.hide_profile,0)=0")
       .bind(receiverId)
       .first<{ email: string | null }>();
 
@@ -82,17 +92,11 @@ app.post("/", requireAuth, async (c) => {
       return c.json({ error: "Unable to express interest. Candidate connection unavailable." }, 403);
     }
 
-    await db
-      .prepare(
-        `INSERT INTO interest_requests (sender_id, receiver_id, status, message)
-         VALUES (?, ?, 'pending', ?)
-         ON CONFLICT(sender_id, receiver_id) DO UPDATE SET
-           status = 'pending',
-           message = excluded.message,
-           created_at = CURRENT_TIMESTAMP`
-      )
-      .bind(user.id, receiverId, message || null)
-      .run();
+    const existing = await db.prepare(`SELECT id,status FROM interest_requests WHERE
+      (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)`).bind(user.id,receiverId,receiverId,user.id).first<{id:number;status:string}>();
+    if(existing)return c.json({success:true,message:existing.status==='accepted'?'You are already connected.':'An interest already exists.',interestId:existing.id});
+    await db.prepare(`INSERT INTO interest_requests(sender_id,receiver_id,status,message) VALUES(?,?,'pending',?)`)
+      .bind(user.id,receiverId,message?.trim()||null).run();
 
     const senderProfile = await db
       .prepare("SELECT highest_degree FROM profiles WHERE user_id = ?")
@@ -152,6 +156,10 @@ app.patch("/:id", requireAuth, async (c) => {
       return c.json({ error: "Forbidden: you can only respond to match interests sent to you" }, 403);
     }
 
+    if(interest.status !== 'pending')return c.json({error:'This interest has already been answered.'},409);
+    const blocked=await db.prepare(`SELECT 1 FROM blocked_users WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)`)
+      .bind(user.id,interest.sender_id,interest.sender_id,user.id).first();
+    if(blocked)return c.json({error:'This connection is unavailable.'},403);
     await db
       .prepare("UPDATE interest_requests SET status = ?, responded_at = CURRENT_TIMESTAMP WHERE id = ?")
       .bind(status, id)

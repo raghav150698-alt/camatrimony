@@ -1,37 +1,42 @@
-# Launch review — 5 November 2026
+# Launch review — 10 November 2026
 
-Status: code and client preview can be reviewed; production cutover is not yet verified.
+Status: implementation and local review are ready for client testing. Production cutover remains pending verified authentication configuration, existing-user migration and deployment access. No live D1/R2 records or production deployments were changed.
 
-## Completed
+## Implemented
 
-- Expanded qualification options across professional, undergraduate, postgraduate, medical, legal, design, teaching and diploma programmes. Other accepts a custom qualification, persists it as the actual degree, and restores it for editing.
-- Shared validation enforces whole-year ages of 18–70 for women and 21–70 for men. Creation, editing, final wizard submission, preview saves and the real profile API apply the same rules. Changing gender revalidates age.
-- Degree validation rejects a blank Other value and limits qualifications to 120 characters. No database migration is needed for these input changes.
-- Fixed the admin subscription form reset that prevented the admin app from building.
-- Updated Next.js to 16.4.5 and Hono to 4.13.16, including the auth package. Pinned patched transitive dependencies for the advisories found in the initial audit.
-- Production dependency audit: 0 critical, 0 high, 0 moderate, 0 low. This is a dependency advisory check, not a complete security audit.
-- Customer website and admin production builds pass; shared package builds and API TypeScript checks pass. API packaging dry-run passes.
-- 19 unit regressions pass, including age boundaries, gender changes, custom degrees, matching and response normalization. Local API tests verified age enforcement and degree persistence and restored the synthetic account afterward.
-- SEO checks pass for 10 public pages and 17 private routes.
+- Cloudflare D1, R2 and Hono remain the data, storage and API stack. Supabase Auth support covers member Google/phone sign-in and administrator email/password sessions. PKCE, session refresh, validated internal redirects and stable D1 identity mapping preserve existing member relationships.
+- Authentication fails closed when the auth provider or D1 is unavailable. Anonymous identities and production mock tokens are rejected. Staff permissions come from explicit D1 assignments; user-editable metadata cannot grant access. Legacy admin sessions now require a live token-specific session record.
+- Membership credits: atomic contact unlock/debit/ledger writes, no duplicate charge, no spending before the start date or after expiry, exhausted-plan handling, and zero charge for hidden/blocked/unavailable contacts. Existing balances receive an opening ledger entry. The redesigned membership page displays available credits, dates and history.
+- Administrator assignment is transactional. Expired/scheduled status is calculated consistently. Invalid/fractional periods are rejected; cancelled plans cannot be revived through extension. Retiring packages preserves membership/payment records. Manual approval does not mark KYC verified.
+- Profile detail normalization and complete biodata viewing remain in place. Contacts and verification documents are excluded from other members' biodata. The document/photo editor uses separate controls and readable filenames, including its mobile layout.
+- Saved profiles/interests respect privacy and blocks. Duplicate interests no longer reset accepted connections. Chat checks recipient availability and blocks, and the profile now offers chat after an accepted interest or contact unlock.
+- Private uploads use no-store headers and exact ownership checks. Member/premium photos use scoped, expiring links with server-side privacy checks. Pending/rejected photos remain private to their owner/review staff. Document replacement invalidates its earlier verification approval.
+- New profile media references must belong to that member. Age and custom degree validation remain enforced. No gateway rollout/configuration notes are shown in customer checkout/pricing copy.
+- Replaced the incompatible legacy frontend deployment adapter with OpenNext for Cloudflare Workers, preserving Next.js. A Linux validation script and cutover runbook are included.
 
-## Live read-only checks
+## Verification
 
-- Existing Workers API health: 200.
-- Anonymous access to the self-profile endpoint: 401.
-- CORS permits the current website origin.
-- Current payment settings: Razorpay disabled; manual payments enabled. This does not verify a payment or manual approval transaction.
-- api.camatrimonybncn.com did not resolve in DNS. The example web config and API media base now use the existing, verified camatrimony-api.gentle-mode-2ab9.workers.dev endpoint. Configure and verify the custom API domain before switching to it.
+- 49 regression checks pass: 19 shared tests and 30 API integration groups using an isolated SQLite database and mocked Supabase authority. No real user records or actual messages/payments are used by these tests.
+- Integration coverage includes concurrent last-credit requests, duplicate unlocks, forced ledger failure rollback, scheduled/expired plans, hidden contacts, account bans, auth outages, existing-identity collisions, photo URL tampering, document replacement and administrator grant/revocation.
+- Customer and admin production builds, Cloudflare bundles and dry-run packaging pass on Linux. API TypeScript checks pass. Compressed Worker code is approximately 2.26 MiB (web) and 1.05 MiB (admin).
+- Packaged website Worker runtime returned HTTP 200 for home, about, memberships, login, profile, my-plan, robots and sitemap. Private-page noindex metadata was checked. This does not replace real OAuth/OTP or production load testing.
+- SEO checks pass for 10 public pages and 17 private routes, structured data, canonical URLs, robots, sitemap and preview image.
+- Full dependency audit (including new build tools): 0 critical/high/moderate/low findings after patches. This is an advisory check, not a guarantee of application security.
+- Browser review opened a complete fictional profile successfully, unlocked one contact, observed 30 → 29 credits, reopened that contact without another charge, and reviewed the media editor at desktop and 390px mobile width.
 
-## Required before production cutover
+## Required for live cutover
 
-1. Back up the live D1 database and check which of the existing 12 migrations are pending. Apply only required migrations; never apply review seeds remotely.
-2. Configure real website/admin environment variables, Firebase domains and the production API URL. Disable client-preview and local-review flags. Verify the admin signing secret and email credentials in the platform secret store.
-3. Exercise Google login and mobile OTP, complete a real new-profile flow, and verify document access and review with authorized test accounts.
-4. Confirm the intended payment mode. Test manual payment submission and admin approval, or configure Razorpay credentials/webhook and test the full gateway flow before enabling it.
-5. Exercise two-account interests, accepted messaging, blocks, contact unlocks and subscription credit handling against staging/production test accounts.
-6. Deploy the updated API and website/admin through a validated production pipeline, then verify the custom domains, HTTPS, error reporting and database backups. The Vercel web build is validated; legacy next-on-pages scripts are not compatible with the current framework and must not be used for cutover.
-7. Confirm production abuse controls/rate limits and monitoring. Submit the live sitemap to Search Console after the correct production deployment is active.
+1. Finish Google OAuth and phone provider configuration in the client's Supabase project. Configure exact redirect URLs and obtain the publishable project key. Real Google/OTP and refresh/logout checks are still pending.
+2. Obtain trusted Firebase Auth exports and link/create the corresponding Supabase users. Review all existing member mappings before switching providers. Provision/verify the first administrator explicitly. See AUTH_CUTOVER.md.
+3. Authorize deployment access to the correct Cloudflare account. The signed-in browser works, but Wrangler currently has no authenticated deployment session. Back up D1, inspect remote migration/schema history, then apply only required migrations (including 0013–0015). Never apply fixture seeds remotely.
+4. Verify that the R2 bucket's public domains cannot bypass private-file controls. Review existing upload ownership and legacy keys before release. Retain backups and a rollback deployment.
+5. Deploy API, web and admin with matching provider settings and production preview flags disabled. Verify current domains, CORS, error reporting, delivery credentials and two real authorized test members.
+6. Final payment-provider integration remains pending. Cashfree sandbox can be used for test transactions; approval of hire.valases.com does not establish approval of the client's matrimony domain/business/settlement account. Do not enable real checkout before its server/webhook verification tests pass.
 
-No live data was modified and no production API/database deployment was performed in this review.
+## Hosting ownership findings
 
-Security references: [Next.js cache advisory](https://github.com/advisories/GHSA-673q-mjm6-r5xr), [Next.js image advisory](https://github.com/advisories/GHSA-2464-fhr4-w9xw). The patches were selected from the package registry's advisory results.
+- The signed-in client Hostinger account has no listed hosting subscriptions, websites or domains.
+- Public registration records identify Hostinger Operations, UAB as registrar for camatrimonybncn.com. Nameservers are Cloudflare; this alone does not reveal the website's origin host.
+- A domain-registration/Domain Shield promotional email is not evidence of a hosting-plan purchase. The original recipient address, invoice or owning account is needed to resolve Hostinger access. No new plan or domain add-on was purchased.
+
+Current live services were inspected read-only. Local demo account credits are fictional; production balances were not changed.

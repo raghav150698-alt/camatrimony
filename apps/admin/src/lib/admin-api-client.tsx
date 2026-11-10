@@ -1,3 +1,4 @@
+import {getSupabaseAuth,usesSupabaseAuth} from "@camatrimony/auth/client";
 /**
  * Admin API Client
  *
@@ -76,6 +77,14 @@ export function clearAdminToken(): void {
   localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
+export async function getAdminAuthHeaders(): Promise<Record<string,string>> {
+  if(usesSupabaseAuth){
+    const {data,error}=await getSupabaseAuth().auth.getSession();
+    return !error && data.session ? {Authorization:`Bearer ${data.session.access_token}`} : {};
+  }
+  const token=getAdminToken();return token ? {'x-admin-token':token} : {};
+}
+
 export interface AdminApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -105,15 +114,12 @@ export class AdminApiClient {
     };
 
     // Auto-attach admin token
-    const token = getAdminToken();
-    if (token) {
-      headers["x-admin-token"] = token;
-    }
+    Object.assign(headers,await getAdminAuthHeaders());
 
     const fetchOptions: RequestInit = {
       method,
-      headers,
       ...options,
+      headers,
     };
 
     if (body !== undefined && body !== null) {
@@ -217,9 +223,7 @@ export const adminApi = {
     formData.append("type", "payment_proof");
 
     const url = `${getBaseUrl()}/admin/media`;
-    const token = getAdminToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["x-admin-token"] = token;
+    const headers = await getAdminAuthHeaders();
 
     try {
       const res = await fetch(url, { method: "POST", headers, body: formData });

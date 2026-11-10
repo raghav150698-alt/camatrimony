@@ -54,3 +54,6 @@ export async function submitManualPaymentProof(
 ): Promise<ApiResponse<{ id: string; status: string; packageId: number }>> {
   return getApiClient().post("/payments/manual-proof", { packageId, proofUrl, notes });
 }
+
+export interface CreditEntry {id:number;subscription_id:number;amount:number;balance_after:number;reason:string;created_at:string;profileId?:string;}
+export async function getCreditHistory():Promise<ApiResponse<CreditEntry[]>> {return getApiClient().get('/payments/credits');}

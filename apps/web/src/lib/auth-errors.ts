@@ -62,6 +62,10 @@ export function normalizePhoneNumber(raw: string): string {
 export function formatAuthError(err: unknown): string {
   const code = typeof err === "object" && err && "code" in err ? String((err as { code?: string }).code || "") : "";
   const messages: Record<string, string> = {
+    "otp_expired": "That code has expired or is incorrect. Request a new code.",
+    "over_sms_send_rate_limit": "Please wait before requesting another code.",
+    "sms_send_failed": "Mobile sign-in is temporarily unavailable. Please try Google sign-in.",
+    "provider_disabled": "This sign-in method is unavailable. Try another method.",
     "auth/too-many-requests": "Too many attempts. Please wait a little, or try Google sign-in.",
     "auth/quota-exceeded": "Mobile sign-in is temporarily unavailable. Please try Google sign-in.",
     "auth/billing-not-enabled": "Mobile sign-in is temporarily unavailable. Please try Google sign-in.",

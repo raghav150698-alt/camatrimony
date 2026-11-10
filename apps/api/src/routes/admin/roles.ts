@@ -11,10 +11,10 @@ app.get("/", requireAdmin, async (c) => {
 
     const rows = await db
       .prepare(
-        `SELECT u.id, u.email, u.phone, u.role, u.status, u.last_login_at
-         FROM users u
-         WHERE u.role IN ('admin', 'super_admin', 'moderator', 'support_agent')
-         ORDER BY u.created_at DESC`
+        `SELECT a.id,a.email,NULL AS phone,a.role,CASE WHEN a.is_active=1 THEN 'active' ELSE 'suspended' END AS status,a.last_login_at
+         FROM admin_accounts a
+         UNION SELECT u.id,u.email,u.phone,r.role,u.status,u.last_login_at FROM users u
+         JOIN admin_roles r ON r.user_id=u.id WHERE NOT EXISTS(SELECT 1 FROM admin_accounts a WHERE a.id=u.id)`
       )
       .all<any>();
 
@@ -56,6 +56,7 @@ app.post("/", requireSuperAdmin, async (c) => {
         userId = existingUser.id;
         await db.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, userId).run();
       } else {
+        if(c.env.AUTH_PROVIDER==='supabase')return c.json({error:'This staff member must sign in once before you assign access.'},409);
         userId = "admin_" + Math.random().toString(36).substring(2, 10);
         await db
           .prepare("INSERT INTO users (id, email, phone, role, status) VALUES (?, ?, ?, ?, 'active')")
@@ -93,6 +94,8 @@ app.post("/", requireSuperAdmin, async (c) => {
         return c.json({ error: "You cannot revoke your own admin permissions." }, 400);
       }
 
+      await db.prepare('UPDATE admin_accounts SET is_active=0 WHERE id=?').bind(targetUserId).run();
+      await db.prepare('DELETE FROM admin_sessions WHERE admin_id=?').bind(targetUserId).run();
       await db.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(targetUserId).run();
       await db.prepare("DELETE FROM admin_roles WHERE user_id = ?").bind(targetUserId).run();
 

@@ -1,3 +1,4 @@
+import {signProfilePhotos} from "../services/media-access";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import {
@@ -6,6 +7,7 @@ import {
   getPublicApiBase,
   absolutizeMediaUrl,
   ensureUserRecord,
+  extractUploadKey,
 } from "../lib";
 import { requireAuth } from "../middleware/auth";
 import { DEFAULT_API_BASE_URL, validateProfileAge, validateProfileDegree } from "@camatrimony/shared";
@@ -123,7 +125,7 @@ export function mapMemberProfile(row: any, apiBase: string = DEFAULT_API_BASE_UR
 }
 
 /** Public/catalog-safe projection — no email, phone, address, docs, or proof. */
-export function mapPublicProfile(row: any, apiBase: string = DEFAULT_API_BASE_URL) {
+export function mapPublicProfile(row: any, apiBase: string = DEFAULT_API_BASE_URL, member = false) {
   return {
     userId: row.user_id,
     fullName: row.full_name ?? row.fullName ?? "",
@@ -156,7 +158,7 @@ export function mapPublicProfile(row: any, apiBase: string = DEFAULT_API_BASE_UR
     familyStatus: row.family_status ?? row.familyStatus,
     familyType: row.family_type ?? row.familyType,
     familyValues: row.family_values ?? row.familyValues ?? "",
-    photos: row.photo_visibility === "private" ? [] : parsePhotosAbsolute(row.photos, apiBase),
+    photos: row.photo_visibility === "private" || row.photo_visibility === "premium" || (row.photo_visibility === "members" && !member) ? [] : parsePhotosAbsolute(row.photos, apiBase),
     isVerified: row.is_verified === 1 || row.isVerified === true,
     isFeatured: row.is_featured === 1 || row.isFeatured === true,
     aboutMe: row.about_me ?? row.aboutMe,
@@ -214,7 +216,7 @@ app.get("/", requireAuth, async (c) => {
 
     return c.json({
       success: true,
-      profile: mapProfile(row, apiBase),
+      profile: await signProfilePhotos(mapProfile(row, apiBase), userId,c.env,c.req.url),
     });
   } catch (err: any) {
     return c.json({ error: err?.message || "Server Error" }, 500);
@@ -241,6 +243,28 @@ app.post("/", requireAuth, async (c) => {
     const isVerified = existing ? existing.is_verified : 0;
     const isFeatured = existing ? existing.is_featured : 0;
 
+    if(profileData.photos !== undefined && (!Array.isArray(profileData.photos) || profileData.photos.length>10
+      || profileData.photos.some((value:unknown)=>typeof value!=='string' || !value || value.length>4096)))
+      return c.json({error:'Choose up to 10 valid profile photos.'},400);
+    const canonical=(raw:string)=>{
+      try{const url=new URL(raw);for(const key of ['viewer','expires','signature'])url.searchParams.delete(key);return url.href;}catch{return raw;}
+    };
+    const owns=(raw:string,category:string)=>{
+      const key=extractUploadKey(raw);if(!key?.startsWith(`${userId}/${category}/`))return false;
+      if(raw.startsWith('http')) {try{return new URL(raw).origin===new URL(apiBase).origin;}catch{return false;}}
+      return true;
+    };
+    const oldPhotos=parsePhotos(existing?.photos).map(canonical);
+    if(Array.isArray(profileData.photos)){
+      if(profileData.photos.some((raw:string)=>!oldPhotos.includes(canonical(raw))&&!owns(raw,'photos')))
+        return c.json({error:'Upload your own profile photos before saving.'},400);
+      profileData.photos=profileData.photos.map(canonical);
+    }
+    for(const [camel,snake,category] of [['govtIdFile','govt_id_file','govt_id'],['degreeFile','degree_file','degree'],['paymentProofUrl','payment_proof_url','payment_proof']]){
+      const raw=profileData[camel]??profileData[snake];
+      if(raw!=null&&raw!==''&&(typeof raw!=='string'||(canonical(raw)!==canonical(existing?.[snake]||'')&&!owns(raw,category))))
+        return c.json({error:'Upload your own document before saving.'},400);
+    }
     const photosFromClient = Array.isArray(profileData.photos) ? profileData.photos : null;
     const photosJSON = JSON.stringify(
       photosFromClient !== null
@@ -328,7 +352,7 @@ app.post("/", requireAuth, async (c) => {
     }
 
     // User row must exist before profiles (FK: profiles.user_id → users.id).
-    await ensureUserRecord(db, userId, profileData.email || user.email || null, now);
+    await ensureUserRecord(db, userId, user.email || null, now);
 
     // UPSERT — never REPLACE (REPLACE deletes the row and NULLs columns not listed,
     // e.g. is_featured_until / created_at, and previously wiped KYC when omitted).
@@ -464,9 +488,9 @@ app.post("/", requireAuth, async (c) => {
 
     return c.json({
       success: true,
-      message: "Profile saved successfully into Cloudflare D1 SQL database.",
+      message: "Profile saved.",
       profile: saved
-        ? mapProfile(saved, apiBase)
+        ? await signProfilePhotos(mapProfile(saved, apiBase),userId,c.env,c.req.url)
         : {
             isOnboardingCompleted: isOnboardingCompleted === 1,
             completionPercentage: profileData.completionPercentage || 0,

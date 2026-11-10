@@ -20,6 +20,8 @@ app.get("/", requireAuth, async (c) => {
 
   try {
     const db = c.env.DB;
+    const gate = await canMessage(db,user.id,user.id===senderId?recipientId:senderId);
+    if(!gate.ok)return c.json({error:gate.reason},403);
     const { results } = await db
       .prepare(
         `SELECT * FROM messages
@@ -67,9 +69,12 @@ app.get("/conversations", requireAuth, async (c) => {
          JOIN messages last_msg ON last_msg.id = conv.max_id
          JOIN users other_user ON other_user.id = conv.other_id
          LEFT JOIN profiles p ON p.user_id = other_user.id
+         LEFT JOIN user_settings privacy ON privacy.user_id=other_user.id
+         WHERE other_user.status='active' AND COALESCE(privacy.hide_profile,0)=0
+           AND NOT EXISTS(SELECT 1 FROM blocked_users b WHERE (b.blocker_id=? AND b.blocked_id=other_user.id) OR (b.blocked_id=? AND b.blocker_id=other_user.id))
          ORDER BY last_msg.sent_at DESC`
       )
-      .bind(user.id, user.id, user.id, user.id)
+       .bind(user.id, user.id, user.id, user.id, user.id, user.id)
       .all<any>();
 
     // Do not return email here — accepted interest unlocks chat but not contact PII.
@@ -92,6 +97,9 @@ app.get("/conversations", requireAuth, async (c) => {
 });
 
 async function canMessage(db: D1Database, senderId: string, recipientId: string): Promise<{ ok: boolean; reason?: string }> {
+  const recipient=await db.prepare(`SELECT u.id FROM users u LEFT JOIN user_settings s ON s.user_id=u.id
+    WHERE u.id=? AND u.status='active' AND COALESCE(s.hide_profile,0)=0`).bind(recipientId).first();
+  if(!recipient)return {ok:false,reason:'This profile is unavailable.'};
   const blocked = await db
     .prepare(
       `SELECT 1 FROM blocked_users
@@ -138,7 +146,7 @@ app.post("/", requireAuth, async (c) => {
     const body = await c.req.json();
     const { recipientId, content } = body;
 
-    if (!recipientId || !content) {
+    if (typeof recipientId !== "string" || typeof content !== "string" || !content.trim() || content.length > 4000) {
       return c.json({ error: "Missing recipientId or content" }, 400);
     }
 
@@ -154,12 +162,12 @@ app.post("/", requireAuth, async (c) => {
 
     await db
       .prepare("INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)")
-      .bind(user.id, recipientId, content)
+      .bind(user.id, recipientId, content.trim())
       .run();
 
     return c.json({
       success: true,
-      message: "Message sent and logged successfully in Cloudflare D1 SQL database.",
+      message: "Message sent.",
     });
   } catch (err: any) {
     return c.json({ error: err?.message || "Server Error" }, 500);

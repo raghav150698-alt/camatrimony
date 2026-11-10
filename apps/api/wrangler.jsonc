@@ -20,6 +20,7 @@
   ],
   "vars": {
     "ENVIRONMENT": "production",
+    "AUTH_PROVIDER": "firebase",
     "CORS_ORIGIN": "https://camatrimonybncn.com,https://admin.camatrimonybncn.com,https://camatrimony-web.pages.dev,https://camatrimony-admin.pages.dev,https://*.camatrimony-web.pages.dev,https://*.camatrimony-admin.pages.dev,http://localhost:3000,http://localhost:3001",
     "FIREBASE_PROJECT_ID": "ca-matrimony-bncn",
     "PUBLIC_API_BASE": "https://camatrimony-api.gentle-mode-2ab9.workers.dev/v1"

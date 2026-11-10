@@ -9,7 +9,7 @@ import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { adminApi } from "@/lib/admin-api-client";
 import AdminSecureMedia from "@/components/AdminSecureMedia";
 
-export const runtime = "edge";
+
 
 function todayDateInputValue() {
   return new Date().toISOString().slice(0, 10);

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../../types";
 import { generateAdminToken, hashToken } from "../../middleware/admin-auth";
+import {getAdminUser} from "../../middleware/auth";
 import { verifyPassword } from "../../lib/password";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
@@ -9,6 +10,7 @@ const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 // CRITICAL FIX: Remove hardcoded credentials, use admin_accounts table from D1,
 // generate HMAC-SHA256 session token using ADMIN_JWT_SECRET, store session in admin_sessions table
 app.post("/", async (c) => {
+  if(c.env.AUTH_PROVIDER === "supabase") return c.json({success:false,message:"Please sign in with your administrator email."},401);
   try {
     const body = await c.req.json();
     const { username, password } = body;
@@ -136,61 +138,11 @@ app.post("/logout", async (c) => {
 
 // GET /v1/admin/auth/validate - Validate existing admin session token
 app.get("/validate", async (c) => {
-  const token = c.req.header("x-admin-token");
-
-  if (!token) {
-    return c.json({ success: false, valid: false, message: "No token provided." }, 401);
-  }
-
-  const secret = c.env.ADMIN_JWT_SECRET;
-  if (!secret) {
-    return c.json({ success: false, valid: false, message: "Server misconfiguration: admin secret missing." }, 500);
-  }
-
-  // Verify token signature
-  const { verifyAdminToken } = await import("../../middleware/admin-auth");
-  const decoded = await verifyAdminToken(token, secret);
-
-  if (!decoded) {
-    return c.json({ success: false, valid: false, message: "Invalid or expired token." }, 401);
-  }
-
-  // Validate against admin_sessions table if available
-  try {
-    const db = c.env.DB;
-    const session = await db
-      .prepare("SELECT expires_at FROM admin_sessions WHERE admin_id = ? ORDER BY created_at DESC LIMIT 1")
-      .bind(decoded.sub)
-      .first<{ expires_at: string }>();
-
-    if (session && new Date(session.expires_at).getTime() < Date.now()) {
-      return c.json({ success: false, valid: false, message: "Session expired." }, 401);
-    }
-
-    // Fetch admin details
-    const adminRow = await db
-      .prepare("SELECT id, username, role, email, display_name FROM admin_accounts WHERE id = ? AND is_active = 1")
-      .bind(decoded.sub)
-      .first<any>();
-
-    if (adminRow) {
-      return c.json({
-        success: true,
-        valid: true,
-        admin: {
-          id: adminRow.id,
-          username: adminRow.username,
-          role: adminRow.role,
-          email: adminRow.email,
-          displayName: adminRow.display_name,
-        },
-      });
-    }
-  } catch {
-    // admin tables may not exist — token signature validation is sufficient
-  }
-
-  return c.json({ success: true, valid: true, admin: { id: decoded.sub, role: decoded.role } });
+  const admin = await getAdminUser(c);
+  if(!admin) return c.json({success:false,valid:false,message:'Invalid or expired administrator session.'},401);
+  const row = await c.env.DB.prepare('SELECT username,display_name FROM admin_accounts WHERE id = ?').bind(admin.id)
+    .first<{username:string;display_name:string}>();
+  return c.json({success:true,valid:true,admin:{...admin,username:row?.username || admin.email || 'Administrator',displayName:row?.display_name || admin.email || 'Administrator'}});
 });
 
 export default app;

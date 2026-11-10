@@ -37,6 +37,10 @@ app.post("/", requireSuperAdmin, async (c) => {
 
     const db = c.env.DB;
 
+    if(typeof name !== 'string' || !name.trim() || name.length > 100 || !Number.isInteger(Number(price)) || Number(price) < 0
+      || !Number.isInteger(Number(validityDays)) || Number(validityDays)<1 || Number(validityDays)>3650
+      || !Number.isInteger(Number(contactLimit)) || Number(contactLimit)<0 || Number(contactLimit)>1000000)
+      return c.json({error:'Enter a valid plan name, non-negative whole price and credits, and 1–3650 days validity.'},400);
     const featuresJSON = JSON.stringify(features || []);
     const result = await db
       .prepare(
@@ -82,6 +86,9 @@ app.patch("/:id", requireSuperAdmin, async (c) => {
     const isActive = body.isActive !== undefined ? (body.isActive ? 1 : 0) : pkg.is_active;
     const features = body.features ? JSON.stringify(body.features) : pkg.features;
 
+    if(typeof name !== 'string' || !name.trim() || name.length>100 || !Number.isInteger(price)||price<0
+      ||!Number.isInteger(validityDays)||validityDays<1||validityDays>3650||!Number.isInteger(contactLimit)||contactLimit<0||contactLimit>1000000)
+      return c.json({error:'Enter valid plan details.'},400);
     await db
       .prepare(
         `UPDATE packages SET name = ?, price = ?, validity_days = ?, contact_limit = ?, chat_allowed = ?, is_active = ?, features = ? WHERE id = ?`
@@ -116,7 +123,7 @@ app.delete("/:id", requireSuperAdmin, async (c) => {
       return c.json({ error: "Package not found" }, 404);
     }
 
-    await db.prepare("DELETE FROM packages WHERE id = ?").bind(Number(id)).run();
+    await db.prepare("UPDATE packages SET is_active = 0 WHERE id = ?").bind(Number(id)).run();
 
     await db
       .prepare(
@@ -126,7 +133,7 @@ app.delete("/:id", requireSuperAdmin, async (c) => {
       .bind(admin.id, id, JSON.stringify({ deleted: true }))
       .run();
 
-    return c.json({ success: true, message: "Package deleted successfully." });
+    return c.json({ success: true, message: "Package retired. Existing memberships are preserved." });
   } catch (err: any) {
     return c.json({ error: err?.message || "Server Error" }, 500);
   }

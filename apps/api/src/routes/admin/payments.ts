@@ -90,38 +90,14 @@ app.post("/:id/confirm", requirePermission("payments"), async (c) => {
     const now = new Date().toISOString();
     const endDate = new Date(Date.now() + pkg.validity_days * 24 * 60 * 60 * 1000).toISOString();
 
-    await db
-      .prepare(
-        `UPDATE payments
-         SET status = 'captured', verified_by = ?, verified_at = ?, admin_notes = COALESCE(?, admin_notes), payment_method = COALESCE(payment_method, 'manual')
-         WHERE id = ?`
-      )
-      .bind(admin.id, now, notes || null, paymentId)
-      .run();
-
-    await db
-      .prepare("UPDATE user_subscriptions SET status = 'cancelled' WHERE user_id = ? AND status = 'active'")
-      .bind(payment.user_id)
-      .run();
-
-    await db
-      .prepare(
-        `INSERT INTO user_subscriptions (user_id, package_id, start_date, end_date, status, payment_id, contact_limit_balance)
-         VALUES (?, ?, ?, ?, 'active', ?, ?)`
-      )
-      .bind(payment.user_id, pkg.id, now, endDate, paymentId, pkg.contact_limit || 0)
-      .run();
-
-    if (activateUser) {
-      await db
-        .prepare("UPDATE users SET status = 'active' WHERE id = ?")
-        .bind(payment.user_id)
-        .run();
-      await db
-        .prepare("UPDATE profiles SET is_verified = 1 WHERE user_id = ?")
-        .bind(payment.user_id)
-        .run();
-    }
+    await db.batch([
+      db.prepare(`UPDATE payments SET status='captured',verified_by=?,verified_at=?,admin_notes=COALESCE(?,admin_notes),payment_method=COALESCE(payment_method,'manual')
+        WHERE id=? AND status IN ('pending_verification','pending')`).bind(admin.id,now,notes||null,paymentId),
+      db.prepare(`UPDATE user_subscriptions SET status='cancelled' WHERE user_id=? AND status='active'`).bind(payment.user_id),
+      db.prepare(`INSERT INTO user_subscriptions(user_id,package_id,start_date,end_date,status,payment_id,contact_limit_balance)
+        VALUES(?,?,?,?,'active',?,?)`).bind(payment.user_id,pkg.id,now,endDate,paymentId,pkg.contact_limit||0),
+      ...(activateUser?[db.prepare(`UPDATE users SET status='active' WHERE id=? AND status NOT IN ('banned','suspended')`).bind(payment.user_id)]:[]),
+    ]);
 
     await db
       .prepare(

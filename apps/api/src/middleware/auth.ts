@@ -1,3 +1,5 @@
+import { HTTPException } from "hono/http-exception";
+import {verifySupabaseIdentity, resolveMemberIdentity} from "../services/supabase-auth";
 import type { Context, MiddlewareHandler } from "hono";
 import { verifyFirebaseToken } from "@camatrimony/auth/server";
 import type { Env, HonoVariables, AuthUser, AdminRole } from "../types";
@@ -7,7 +9,7 @@ import { hashToken, verifyAdminToken } from "./admin-auth";
 type AppContext = Context<{ Bindings: Env; Variables: HonoVariables }>;
 
 /**
- * Extracts and verifies the Firebase user from the Authorization header.
+ * Extracts and verifies the configured auth provider identity from the Authorization header.
  * No x-user-id header or userId query param is trusted.
  */
 export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | null> {
@@ -16,11 +18,12 @@ export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | nu
     return null;
   }
 
+  if(c.env.AUTH_PROVIDER && !["firebase","supabase"].includes(c.env.AUTH_PROVIDER))throw new HTTPException(503,{message:"Sign-in is temporarily unavailable."});
   const token = authHeader.substring(7);
   if (!token) return null;
 
   const projectId = c.env.FIREBASE_PROJECT_ID;
-  if (!projectId) {
+  if (c.env.AUTH_PROVIDER !== "supabase" && !projectId) {
     console.error("FIREBASE_PROJECT_ID is not configured");
     return null;
   }
@@ -33,18 +36,15 @@ export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | nu
     return { id: token, email: reviewUser.email, role: "user", isBanned: reviewUser.status !== "active" };
   }
 
-  const payload = await verifyFirebaseToken(token, projectId);
-  if (!payload) {
-    return null;
-  }
-
-  const userId = payload.sub || payload.user_id;
-  if (!userId) {
-    return null;
-  }
-
+  const supabase = c.env.AUTH_PROVIDER === 'supabase'
+    ? await verifySupabaseIdentity(token,c.env) : null;
+  const payload = c.env.AUTH_PROVIDER === 'supabase' ? null : await verifyFirebaseToken(token, projectId);
+  if (!supabase && !payload) return null;
   try {
     const db = c.env.DB;
+    const userId = supabase ? await resolveMemberIdentity(supabase,db) : payload!.sub || payload!.user_id;
+    if (!userId) return null;
+    const authEmail = supabase?.email_confirmed_at ? supabase.email : payload?.email;
 
     const userRow = await db
       .prepare("SELECT id, email, role, status FROM users WHERE id = ?")
@@ -55,7 +55,7 @@ export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | nu
       !!userRow && (userRow.status === "banned" || userRow.status === "suspended");
 
     if (isBanned) {
-      return { id: userId, email: userRow?.email || payload.email || null, role: "user", isBanned: true };
+      return { id: userId, email: userRow?.email || authEmail || null, role: "user", isBanned: true };
     }
 
     const adminRoleRow = await db
@@ -67,19 +67,14 @@ export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | nu
 
     return {
       id: userId,
-      email: userRow?.email || payload.email || null,
+      email: userRow?.email || authEmail || null,
       role: resolvedRole,
       isBanned: false,
     };
   } catch (err) {
-    // Local D1 or profile row may be missing for brand-new signups — still trust the Firebase JWT.
-    console.error("Auth middleware DB lookup failed, using JWT identity:", err);
-    return {
-      id: userId,
-      email: payload.email || null,
-      role: "user",
-      isBanned: false,
-    };
+    if (err instanceof HTTPException) throw err;
+    console.error("Auth database unavailable:", err);
+    throw new HTTPException(503, {message:'Sign-in is temporarily unavailable. Please try again.'});
   }
 }
 
@@ -89,9 +84,24 @@ export async function getAuthenticatedUser(c: AppContext): Promise<AuthUser | nu
  * ADMIN_JWT_SECRET and looked up in admin_accounts.
  */
 export async function getAdminUser(c: AppContext): Promise<AuthUser | null> {
+  if (c.env.AUTH_PROVIDER === 'supabase') {
+    const token = c.req.header('Authorization')?.replace(/^Bearer /,'');
+    if (!token) return null;
+    const identity = await verifySupabaseIdentity(token,c.env);
+    if (!identity) return null;
+    const admin = await c.env.DB.prepare(`SELECT id,email,role FROM admin_accounts
+      WHERE supabase_subject = ? AND is_active = 1`).bind(identity.id)
+      .first<{id:string;email:string;role:AdminRole}>();
+    if(admin && ['super_admin','moderator','support_agent'].includes(admin.role))return {...admin,isBanned:false};
+    const memberAdmin=await c.env.DB.prepare(`SELECT u.id,u.email,r.role FROM auth_identities a
+      JOIN users u ON u.id=a.user_id JOIN admin_roles r ON r.user_id=u.id
+      WHERE a.provider='supabase' AND a.subject=? AND u.status NOT IN ('banned','suspended','deleted')`)
+      .bind(identity.id).first<{id:string;email:string;role:AdminRole}>();
+    return memberAdmin && ['super_admin','moderator','support_agent'].includes(memberAdmin.role) ? {...memberAdmin,isBanned:false} : null;
+  }
   // Prefer Firebase-based admin auth if available
   const firebaseUser = await getAuthenticatedUser(c);
-  if (firebaseUser && (firebaseUser.role === "super_admin" || firebaseUser.role === "moderator" || firebaseUser.role === "support_agent")) {
+  if (firebaseUser && !firebaseUser.isBanned && (firebaseUser.role === "super_admin" || firebaseUser.role === "moderator" || firebaseUser.role === "support_agent")) {
     return firebaseUser;
   }
 
@@ -116,7 +126,7 @@ export async function getAdminUser(c: AppContext): Promise<AuthUser | null> {
     const session = await db
       .prepare(
         `SELECT admin_id FROM admin_sessions
-         WHERE token_hash = ? AND admin_id = ? AND expires_at > datetime('now')
+         WHERE token_hash = ? AND admin_id = ? AND julianday(expires_at) > julianday('now')
          LIMIT 1`
       )
       .bind(tokenHash, decoded.sub)

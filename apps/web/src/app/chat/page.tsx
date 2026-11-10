@@ -159,14 +159,14 @@ function ChatPageContent() {
           const profRes = await getProfileByUserId(partnerId);
           if (profRes.success && profRes.data) {
             const p = profRes.data as any;
-            const name = p.occupation?.split(",")[0] || meta?.name || "CA Member";
+            const name = p.fullName || p.full_name || meta?.name || "Member";
             channelList.push({
               userId: partnerId,
               name,
               highestDegree: p.highestDegree || meta?.highestDegree || "Professional",
               occupation: p.occupation || meta?.occupation || "",
               online: false,
-              avatar: p.photos?.[0] || "/success_story_1.png",
+              avatar: p.photos?.[0] || "/avatar-placeholder.svg",
               initials: name.substring(0, 2).toUpperCase(),
               photos: p.photos || [],
             });

@@ -12,7 +12,7 @@ import {
   RecaptchaVerifier,
   ConfirmationResult
 } from "firebase/auth";
-import { auth, googleProvider } from "@camatrimony/auth/client";
+import { auth, googleProvider, getSupabaseAuth, usesSupabaseAuth } from "@camatrimony/auth/client";
 import { getProfile, updateProfile, setAuthTokenGetter } from "@camatrimony/api-client";
 import { normalizePhoneNumber, stashAuthNextFromUrl } from "@/lib/auth-errors";
 import { hasReviewSession, isLocalReview, REVIEW_SESSION_KEY, REVIEW_USER_ID } from "@/lib/local-review";
@@ -69,6 +69,7 @@ export interface DBUserProfile {
 }
 
 interface AuthContextType {
+  authError?: string;
   user: User | null;
   dbUser: DBUserProfile | null;
   loading: boolean;
@@ -168,7 +169,7 @@ function normalizeDbUser(raw: any): DBUserProfile {
   };
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+function FirebaseAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [dbUser, setDbUser] = useState<DBUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -470,6 +471,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+export function AuthProvider({children}:{children:React.ReactNode}) {
+  return usesSupabaseAuth && !isLocalReview()
+    ? <SupabaseAuthProvider>{children}</SupabaseAuthProvider>
+    : <FirebaseAuthProvider>{children}</FirebaseAuthProvider>;
+}
+
+function SupabaseAuthProvider({children}:{children:React.ReactNode}) {
+  const [user,setUser] = useState<User|null>(null);
+  const [dbUser,setDbUser] = useState<DBUserProfile|null>(null);
+  const [loading,setLoading] = useState(true);
+  const [authError,setAuthError] = useState('');
+  const phoneRef = React.useRef('');
+  const generation = React.useRef(0);
+  const sync = async (identity: {id:string;email?:string;phone?:string;user_metadata?:Record<string,any>} | null) => {
+    const run = ++generation.current;
+    setAuthError('');
+    if (!identity) {setUser(null);setDbUser(null);setLoading(false);return;}
+    try {
+      const response = await getProfile();
+      if (!response.success || !response.data) throw new Error(response.error || 'Could not load your profile. Please try again.');
+      if (run !== generation.current) return;
+      const profile = response.data as any;
+      setDbUser(normalizeDbUser(profile));
+      setUser({uid:profile.userId || identity.id,email:identity.email || null,phoneNumber:identity.phone || null,
+        displayName:profile.fullName || identity.user_metadata?.full_name || null} as User);
+    } catch(error) {
+      if (run !== generation.current) return;
+      setUser(null);setDbUser(null);
+      setAuthError(error instanceof Error ? error.message : 'Could not load your profile.');
+    } finally {if (run === generation.current) setLoading(false);}
+  };
+  useEffect(()=>{
+    let active = true;
+    let unsubscribe: (()=>void)|undefined;
+    try {
+      const client = getSupabaseAuth();
+      setAuthTokenGetter(async options=>{
+        const result = options?.forceRefresh ? await client.auth.refreshSession() : await client.auth.getSession();
+        if (result.error) return null;
+        return result.data.session?.access_token || null;
+      });
+      // Do not await auth methods from inside the SDK's synchronous event callback.
+      const {data} = client.auth.onAuthStateChange((_event,session)=>{
+        setTimeout(()=>{if(active) void sync(session?.user || null);},0);
+      });
+      unsubscribe = ()=>data.subscription.unsubscribe();
+      client.auth.getSession().then(result=>{
+        if(!active)return;
+        if(result.error){setAuthError('Please sign in again.');setLoading(false);return;}
+        void sync(result.data.session?.user || null);
+      }).catch(()=>{if(active){setAuthError('Sign-in is temporarily unavailable.');setLoading(false);}});
+    } catch(error) {setAuthError(error instanceof Error ? error.message : 'Sign-in is temporarily unavailable.');setLoading(false);}
+    return ()=>{active=false;generation.current++;unsubscribe?.();setAuthTokenGetter(async()=>null);};
+  },[]);
+  const loginWithGoogle = async()=>{
+    stashAuthNextFromUrl();
+    const {error} = await getSupabaseAuth().auth.signInWithOAuth({provider:'google',
+      options:{redirectTo:`${window.location.origin}/login`}});
+    if(error)throw error;
+  };
+  const loginWithPhone = async(raw:string,_containerId:string)=>{
+    const phone = normalizePhoneNumber(raw);
+    if(!/^\+[1-9]\d{7,14}$/.test(phone)) throw Object.assign(new Error('Invalid phone number'),{code:'auth/invalid-phone-number'});
+    const {error} = await getSupabaseAuth().auth.signInWithOtp({phone});
+    if(error)throw error;
+    phoneRef.current=phone;return true;
+  };
+  const confirmOTP = async(token:string)=>{
+    if(!phoneRef.current)throw new Error('Request a new code.');
+    const {data,error}=await getSupabaseAuth().auth.verifyOtp({phone:phoneRef.current,token,type:'sms'});
+    if(error)throw error;
+    setLoading(true);await sync(data.user);
+  };
+  const logout=async()=>{
+    const {error}=await getSupabaseAuth().auth.signOut();
+    if(error)throw error;
+    generation.current++;setUser(null);setDbUser(null);setAuthError('');
+    if(user){localStorage.removeItem(`profile_${user.uid}`);localStorage.removeItem(`onboarding_wizard_progress_${user.uid}`);}
+  };
+  const updateProfileData=async(data:Partial<DBUserProfile>)=>{
+    if(!user)throw new Error('Please sign in again.');
+    const result=await updateProfile({...dbUser,...data});
+    if(!result.success)throw new Error(result.error || 'Could not save your profile.');
+    setDbUser(normalizeDbUser({...dbUser,...data,...result.data}));
+  };
+  return <AuthContext.Provider value={{user,dbUser,loading,authError,loginWithGoogle,loginWithPhone,confirmOTP,logout,updateProfileData,
+    loginForReview:async()=>{throw new Error('Review login is unavailable.');}}}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

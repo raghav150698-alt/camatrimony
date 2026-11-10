@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@camatrimony/shared": "workspace:*",
+    "@supabase/supabase-js": "2.119.0",
     "hono": "4.13.16"
   },
   "peerDependencies": {

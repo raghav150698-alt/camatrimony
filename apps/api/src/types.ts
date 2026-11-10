@@ -25,7 +25,12 @@ export interface Env {
   LOCAL_REVIEW_AUTH?: string;
   /** Absolute API base including `/v1`, e.g. https://…workers.dev/v1 */
   PUBLIC_API_BASE?: string;
+  AUTH_PROVIDER?: "firebase" | "supabase";
+  MEDIA_SIGNING_SECRET?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
   FIREBASE_PROJECT_ID: string;
+
   RAZORPAY_KEY_ID: string;
   RAZORPAY_KEY_SECRET: string;
   RAZORPAY_WEBHOOK_SECRET: string;

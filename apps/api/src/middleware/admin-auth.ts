@@ -66,7 +66,7 @@ export async function verifyAdminToken(token: string, secret: string): Promise<{
     const expectedSig = base64UrlEncode(new Uint8Array(sigBuffer));
     if (expectedSig !== sigB64) return null;
     const decoded = JSON.parse(payload);
-    if (decoded.exp && decoded.exp < Date.now()) return null;
+    if (!decoded.sub || !Number.isFinite(decoded.exp) || decoded.exp <= Date.now()) return null;
     return decoded;
   } catch {
     return null;
@@ -78,6 +78,7 @@ export async function verifyAdminToken(token: string, secret: string): Promise<{
  * Sets c.set("admin", admin) for downstream handlers.
  */
 export const requireAdminSession: MiddlewareHandler<{ Bindings: Env; Variables: HonoVariables }> = async (c, next) => {
+  if(c.env.AUTH_PROVIDER === "supabase") return c.json({success:false,message:"Use Supabase sign-in."},401);
   const token = c.req.header("x-admin-token");
   if (!token) {
     return c.json({ success: false, valid: false, message: "No admin token provided." }, 401);
@@ -92,54 +93,18 @@ export const requireAdminSession: MiddlewareHandler<{ Bindings: Env; Variables: 
     return c.json({ success: false, valid: false, message: "Invalid or expired admin token." }, 401);
   }
 
-  // Validate against admin_sessions table (server-side token validation)
+  let admin: AuthAdmin;
   try {
-    const db = c.env.DB;
-    const session = await db
-      .prepare("SELECT admin_id, token_hash, expires_at FROM admin_sessions WHERE admin_id = ? ORDER BY created_at DESC LIMIT 1")
-      .bind(decoded.sub)
-      .first<{ admin_id: string; token_hash: string; expires_at: string }>();
-
-    // If sessions table is populated, validate the token hash
-    if (session) {
-      if (new Date(session.expires_at).getTime() < Date.now()) {
-        return c.json({ success: false, valid: false, message: "Admin session expired." }, 401);
-      }
-      // Verify token hash matches
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(token));
-      const tokenHash = Array.from(new Uint8Array(hashBuffer))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      if (tokenHash !== session.token_hash) {
-        return c.json({ success: false, valid: false, message: "Invalid admin session." }, 401);
-      }
-    }
-    // If no session row found, fall back to token-only validation (decoded successfully above)
+    const session = await c.env.DB.prepare(`SELECT admin_id FROM admin_sessions
+      WHERE admin_id = ? AND token_hash = ? AND julianday(expires_at) > julianday('now')`)
+      .bind(decoded.sub,await hashToken(token)).first();
+    if(!session) return c.json({success:false,valid:false,message:'Invalid admin session.'},401);
+    const row = await c.env.DB.prepare(`SELECT id,username,role,email,display_name FROM admin_accounts WHERE id = ? AND is_active = 1`)
+      .bind(decoded.sub).first<any>();
+    if(!row) return c.json({success:false,valid:false,message:'Invalid admin session.'},401);
+    admin={...row,displayName:row.display_name};
   } catch {
-    // admin_sessions table may not be populated — token signature validation is sufficient
-  }
-
-  // Fetch admin account details
-  let admin: AuthAdmin = { id: decoded.sub, username: "", role: decoded.role };
-  try {
-    const db = c.env.DB;
-    const adminRow = await db
-      .prepare("SELECT id, username, role, email, display_name FROM admin_accounts WHERE id = ? AND is_active = 1")
-      .bind(decoded.sub)
-      .first<{ id: string; username: string; role: string; email: string | null; display_name: string | null }>();
-
-    if (adminRow) {
-      admin = {
-        id: adminRow.id,
-        username: adminRow.username,
-        role: adminRow.role,
-        email: adminRow.email,
-        displayName: adminRow.display_name,
-      };
-    }
-  } catch {
-    // admin_accounts table may not exist — use token claims
+    return c.json({success:false,valid:false,message:'Administrator sign-in is temporarily unavailable.'},503);
   }
 
   c.set("admin", admin);

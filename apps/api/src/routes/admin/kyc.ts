@@ -5,7 +5,7 @@ import { sendTemplatedEmail, getPublicApiBase, absolutizeMediaUrl, logAdminAudit
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
-const KYC_SELECT = `SELECT p.user_id, p.profile_created_by, p.highest_degree, p.occupation,
+const KYC_SELECT = `SELECT p.user_id, p.full_name, p.profile_created_by, p.highest_degree, p.occupation,
                 p.govt_id_file, p.degree_file, p.govt_id_status, p.degree_status,
                 p.is_verified, p.created_at,
                 u.email, u.phone, u.status
@@ -31,6 +31,7 @@ function allUploadedDocsApproved(row: {
   govt_id_status?: string | null;
   degree_status?: string | null;
 }): { ok: boolean; message?: string } {
+  if(!row.govt_id_file || !row.degree_file)return {ok:false,message:"Government ID and degree certificate are required for verification."};
   const checks: boolean[] = [];
   if (row.govt_id_file) {
     checks.push(effectiveDocStatus(row.govt_id_file, row.govt_id_status) === "approved");
@@ -53,7 +54,7 @@ function mapKycRow(row: any, apiBase: string) {
   return {
     user_id: row.user_id,
     userId: row.user_id,
-    name: row.profile_created_by || (row.email ? String(row.email).split("@")[0] : "Candidate"),
+    name: row.full_name || (row.email ? String(row.email).split("@")[0] : "Candidate"),
     email: row.email,
     phone: row.phone,
     status: row.status,

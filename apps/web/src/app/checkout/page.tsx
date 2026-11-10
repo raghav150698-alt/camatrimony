@@ -165,7 +165,7 @@ function CheckoutContent() {
   const handleCheckout = async () => {
     if (!user || !pkg) return;
     if (!razorpayEnabled) {
-      setError("Online payments are disabled. Use the manual UPI payment option below.");
+      setError("Please contact our team for membership assistance.");
       return;
     }
     setLoading(true);
@@ -181,7 +181,7 @@ function CheckoutContent() {
       const { orderId, amount, currency } = orderRes.data;
       const key = razorpayKeyId || null;
       if (!key) {
-        setError("Payment gateway key not configured. Please contact support.");
+        setError("Please contact our team for membership assistance.");
         setLoading(false);
         return;
       }
@@ -236,7 +236,7 @@ function CheckoutContent() {
     );
   }
 
-  const showManual = !razorpayEnabled || manualPaymentEnabled;
+  const showManual = manualPaymentEnabled && hasManualPaymentDetails;
 
   return (
     <Layout>
@@ -256,7 +256,7 @@ function CheckoutContent() {
                 ? "Complete payment securely via Razorpay."
                 : hasManualPaymentDetails
                   ? "Pay via UPI / bank transfer and upload proof for admin verification."
-                  : "Payment details are being set up by the admin team."}
+                  : "Contact our team for membership assistance."}
             </p>
           </div>
 
@@ -322,6 +322,7 @@ function CheckoutContent() {
               </Button>
             )}
 
+            {!razorpayEnabled && !showManual && <div className="rounded-2xl border border-slate-200 p-5 space-y-3"><h2 className="font-semibold">Membership assistance</h2><p className="text-sm text-slate-500">Our team can help you choose or manage your membership.</p><Link href="/contact" className="site-action site-action-outline">Contact our team</Link></div>}
             {showManual && (
               <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
@@ -331,12 +332,10 @@ function CheckoutContent() {
                 {!hasManualPaymentDetails ? (
                   <div className="rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
                     <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                      Payment details are not configured yet
+                      Membership assistance
                     </p>
                     <p className="text-sm text-amber-800/90 dark:text-amber-200/90 font-light leading-relaxed">
-                      An admin has not set a UPI ID, QR code, or bank account for checkout.
-                      Please contact support or wait until payment instructions are published —
-                      do not upload a payment screenshot until details are available.
+                      Our team can help you choose or manage your membership.
                     </p>
                     <Link href="/contact" className="inline-block">
                       <Button variant="outline" size="sm">

@@ -8,7 +8,7 @@ import { clearStashedAuthNext, formatAuthError, resolvePostAuthPath, stashAuthNe
 import { isClientPreview, isLocalReview } from "@/lib/local-review";
 
 export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
- const { user, dbUser, loading: authLoading, loginWithGoogle, loginWithPhone, confirmOTP, loginForReview } = useAuth();
+ const { user, dbUser, authError, loading: authLoading, loginWithGoogle, loginWithPhone, confirmOTP, loginForReview } = useAuth();
  const preview=isClientPreview();
  const router=useRouter();const search=useSearchParams();const next=search.get("next");
  const [phone,setPhone]=useState("");const [otp,setOtp]=useState("");const [sent,setSent]=useState(false);const [busy,setBusy]=useState("");const [error,setError]=useState("");const [review,setReview]=useState(false);const [cooldown,setCooldown]=useState(0);
@@ -25,7 +25,7 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
  {!preview&&<>{!sent&&<><button className="site-action site-action-outline w-full" disabled={!!busy} onClick={()=>run("google",loginWithGoogle)}>{busy==="google"?"Connecting…":"Continue with Google"}</button><div className="auth-divider">OR USE YOUR MOBILE</div></>}
  <form onSubmit={e=>{e.preventDefault();if(sent)void run("otp",()=>confirmOTP(otp));else void send();}}>
  {sent?<label className="site-field">Verification code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,""))} required placeholder="6-digit code" autoFocus/></label>:<label className="site-field">Mobile number<input type="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} required placeholder="+91 98765 43210"/><span className="auth-phone-hint">Include your country code.</span></label>}
- <div id={container}/>{error&&<p className="form-error" role="alert">{error}</p>}<button disabled={!!busy} type="submit" className="site-action w-full">{busy?"Please wait…":sent?"Verify & continue":"Send code"}<ArrowRight size={16}/></button>
+ <div id={container}/>{(error||authError)&&<p className="form-error" role="alert">{error||authError}</p>}<button disabled={!!busy} type="submit" className="site-action w-full">{busy?"Please wait…":sent?"Verify & continue":"Send code"}<ArrowRight size={16}/></button>
  {sent&&<div className="auth-code-actions"><button disabled={!!busy||cooldown>0} type="button" onClick={send}>{cooldown?`Resend in ${cooldown}s`:"Resend code"}</button><button disabled={!!busy} type="button" onClick={()=>{setSent(false);setOtp("");setError("");}}>Change number</button></div>}
  </form></>}<p className="auth-fineprint">{mode==="login"?"New to the community? ":"Already have a profile? "}<Link href={alternateHref}>{mode==="login"?"Join us":"Log in"}</Link></p><p className="auth-fineprint">{preview ? "This fictional account is for design review. No registration is created." : <>By continuing, you agree to our <Link href="/terms-and-conditions">Terms</Link> and <Link href="/privacy-policy">Privacy policy</Link>.</>}</p><Link className="site-text-link" href="/forgot-password">Trouble signing in?</Link></div></div>;
 }

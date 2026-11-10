@@ -8,6 +8,7 @@ import { getAuthToken } from "./auth";
  * unreadCount, etc.) remain on the response object for callers that need them.
  */
 const PRIMARY_PAYLOAD_KEYS = [
+  "credits",
   "profiles",
   "notifications",
   "payments",

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
+import { ACTIVE_SUBSCRIPTION_SQL } from "../services/subscriptions";
 import { requireAuth } from "../middleware/auth";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
@@ -14,7 +15,7 @@ app.get("/", requireAuth, async (c) => {
       .prepare(`SELECT cu.*, CASE WHEN COALESCE(privacy.hide_contact,0) = 0 THEN u.phone END AS phone,
         CASE WHEN COALESCE(privacy.hide_contact,0) = 0 THEN u.email END AS email FROM contact_unlocks cu
         JOIN users u ON u.id = cu.unlocked_user_id LEFT JOIN user_settings privacy ON privacy.user_id = u.id
-        WHERE cu.user_id = ? AND u.status = 'active'
+        WHERE cu.user_id = ? AND COALESCE(privacy.hide_profile,0) = 0 AND u.status = 'active'
         AND u.id NOT IN (
           SELECT blocked_id FROM blocked_users WHERE blocker_id = cu.user_id
           UNION SELECT blocker_id FROM blocked_users WHERE blocked_id = cu.user_id
@@ -54,6 +55,9 @@ app.post("/", requireAuth, async (c) => {
     if (!targetVisibility || targetVisibility.status !== "active" || targetVisibility.hide_profile === 1 || blocked) {
       return c.json({ error: "This profile is unavailable." }, 404);
     }
+    const contacts = await db.prepare('SELECT email,phone FROM users WHERE id = ?').bind(targetUserId)
+      .first<{email:string|null;phone:string|null}>();
+    if (!contacts?.email && !contacts?.phone) return c.json({error:'Contact details are not available. No credit was used.'},409);
     if (targetVisibility.hide_contact === 1) return c.json({ error: "This member is keeping contact details private. No credit was used." }, 409);
 
     // Verify if already unlocked
@@ -82,8 +86,8 @@ app.post("/", requireAuth, async (c) => {
     const sub = await db
       .prepare(
         `SELECT id, contact_limit_balance FROM user_subscriptions
-         WHERE user_id = ? AND status = 'active' AND end_date > datetime('now')
-         ORDER BY created_at DESC LIMIT 1`
+         WHERE user_id = ? AND ${ACTIVE_SUBSCRIPTION_SQL}
+         ORDER BY julianday(start_date) DESC, id DESC LIMIT 1`
       )
       .bind(user.id)
       .first<{ id: number; contact_limit_balance: number }>();
@@ -102,37 +106,16 @@ app.post("/", requireAuth, async (c) => {
       );
     }
 
-    // Atomic deduct: only succeed if balance still > 0 (closes TOCTOU race).
-    const deduct = await db
-      .prepare(
-        `UPDATE user_subscriptions
-         SET contact_limit_balance = contact_limit_balance - 1
-         WHERE id = ? AND contact_limit_balance > 0 AND status = 'active' AND end_date > datetime('now')`
-      )
-      .bind(sub.id)
-      .run();
-
-    if (!deduct.meta?.changes) {
-      return c.json(
-        { error: "You have exhausted your contact unlock balance. Please upgrade your plan." },
-        403
-      );
-    }
-
-    try {
-      await db
-        .prepare("INSERT INTO contact_unlocks (user_id, unlocked_user_id) VALUES (?, ?)")
-        .bind(user.id, targetUserId)
-        .run();
-    } catch (insertErr) {
-      // Roll back the debit if unlock insert fails (e.g. unique race).
-      await db
-        .prepare(
-          "UPDATE user_subscriptions SET contact_limit_balance = contact_limit_balance + 1 WHERE id = ?"
-        )
-        .bind(sub.id)
-        .run();
-      throw insertErr;
+    // A single INSERT triggers validation, debit and the ledger atomically.
+    const insert = await db.prepare(`INSERT INTO contact_unlocks (user_id, unlocked_user_id, subscription_id)
+      SELECT ?, ?, id FROM user_subscriptions
+      WHERE id = ? AND ${ACTIVE_SUBSCRIPTION_SQL} AND contact_limit_balance > 0
+        AND NOT EXISTS (SELECT 1 FROM contact_unlocks WHERE user_id = ? AND unlocked_user_id = ?)`)
+      .bind(user.id, targetUserId, sub.id, user.id, targetUserId).run();
+    if (!insert.meta?.changes) {
+      const wonByOtherRequest = await db.prepare('SELECT id FROM contact_unlocks WHERE user_id = ? AND unlocked_user_id = ?')
+        .bind(user.id,targetUserId).first();
+      if (!wonByOtherRequest) return c.json({error:'No contact credits available.'},403);
     }
 
     // Fetch the target user's REAL contact info from D1
@@ -148,7 +131,7 @@ app.post("/", requireAuth, async (c) => {
 
     return c.json({
       success: true,
-      alreadyUnlocked: false,
+      alreadyUnlocked: !insert.meta?.changes,
       email: target?.email || null,
       phone: target?.phone || null,
       remainingBalance: refreshed?.contact_limit_balance ?? Math.max(0, (sub.contact_limit_balance || 0) - 1),

@@ -14,6 +14,7 @@ const SENDER_EMAIL = "CA Matrimony <notifications@camatrimonybncn.com>";
 export async function sendEmail(env: Env, to: string, subject: string, htmlBody: string): Promise<boolean> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
+    if(env.ENVIRONMENT !== "development"){console.error("Email delivery is not configured.");return false;}
     console.log("==================== [MOCK EMAIL OUTBOX] ====================");
     console.log(`To:      ${to}`);
     console.log(`Subject: ${subject}`);
@@ -541,7 +542,7 @@ export async function serveUploadObject(env: Env, key: string): Promise<Response
     headers.set("Cache-Control", object.httpMetadata.cacheControl);
   }
   if (!headers.has("Cache-Control")) {
-    headers.set("Cache-Control", "private, max-age=3600");
+    headers.set("Cache-Control", "private, no-store");
   }
 
   return new Response(object.body, { headers });
@@ -568,7 +569,7 @@ export async function uploadToR2(
     await bucket.put(cleanKey, fileData, {
       httpMetadata: {
         contentType,
-        cacheControl: "public, max-age=31536000",
+        cacheControl: "private, no-store",
       },
     });
     const relative = `/v1/uploads?key=${encodeURIComponent(cleanKey)}`;

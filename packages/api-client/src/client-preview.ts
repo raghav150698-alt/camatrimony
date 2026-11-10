@@ -30,7 +30,7 @@ const initialViewer = {
   occupation: "Finance Manager", partnerAgeRange: "25 - 29", partnerCaste: "Open to all", partnerIncomeMin: "₹15 LPA", partnerEducation: "CA / CS",
   photos: ["https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=700&h=650&fit=crop&crop=faces"],
 };
-type State = { profile: Record<string, any>; favorites: string[]; interests: any[]; settings: Record<string, any> };
+type State = { unlocks?:string[];creditHistory?:any[];planStart?:string;planEnd?:string; profile: Record<string, any>; favorites: string[]; interests: any[]; settings: Record<string, any> };
 const initial = (): State => ({ profile: { ...initialViewer }, favorites: [], interests: [], settings: {
   hideProfile: false, hideContact: false, hideIncome: false, photoVisibility: "public",
   notifyInterests: true, notifyMessages: true, notifyKyc: true, notifyPayments: true,
@@ -44,6 +44,11 @@ export async function clientPreviewResponse(method: string, path: string, body?:
   const url = new URL(path, "https://preview.invalid");
   const p = url.pathname, q = url.searchParams;
   const s = state();
+  if(!s.planStart){s.planStart=new Date().toISOString();s.planEnd=new Date(Date.now()+180*86400000).toISOString();}
+  s.unlocks ||= [];s.creditHistory ||= [{id:1,subscription_id:1,amount:30,balance_after:30,reason:'plan_grant',created_at:s.planStart}];
+  save(s);
+  const active=Date.parse(s.planEnd!)>Date.now();
+  const balance=active ? Math.max(0,30-s.unlocks.length) : 0;
   const ok = (data: any) => ({ success: true, ...data });
   const disabled = () => ({ success: false, error: "This action is unavailable in the client preview. No live data has been changed." });
   if (p === "/profile") {
@@ -96,9 +101,23 @@ export async function clientPreviewResponse(method: string, path: string, body?:
     if (method === "PATCH") { s.settings = { ...s.settings, ...body }; save(s); }
     return ok({ settings: s.settings });
   }
+  if(p==='/unlocks'){
+    if(method==='POST'){
+      const id=body?.targetUserId;
+      const profile=previewProfiles.find(row=>row.userId===id);
+      if(!profile)return {success:false,error:'This profile is unavailable.'};
+      const already=s.unlocks.includes(id);
+      if(!already&&balance<1)return {success:false,error:'No contact credits available.'};
+      if(!already){s.unlocks.push(id);s.creditHistory.unshift({id:Date.now(),subscription_id:1,amount:-1,balance_after:balance-1,reason:'contact_unlock',created_at:new Date().toISOString(),profileId:id});save(s);}
+      return ok({alreadyUnlocked:already,email:`${id}@example.test`,phone:null,remainingBalance:already?balance:balance-1});
+    }
+    return ok({unlocks:s.unlocks.map(id=>({unlocked_user_id:id,email:`${id}@example.test`,phone:null}))});
+  }
   if (method !== "GET") return disabled();
   if (p === "/payments/settings") return ok({ razorpayEnabled: false, manualPaymentEnabled: false, astrologyMatchEnabled: true });
-  if (p === "/payments/subscription") return ok({ subscription: null });
+  if (p === "/payments/credits") return ok({credits:s.creditHistory});
+  if (p === "/payments/subscription") return ok({subscription:{id:1,packageId:1,planName:'6 Months',creditsGranted:30,
+    contactLimitBalance:balance,isActive:active,status:active?'active':'expired',startsAt:s.planStart,expiresAt:s.planEnd,renewalDate:s.planEnd}});
   if (p === "/payments/packages") return ok({ packages: [] });
   if (p === "/stories") return ok({ stories: [] });
   if (p === "/notifications") return ok({ notifications: [], unreadCount: 0 });

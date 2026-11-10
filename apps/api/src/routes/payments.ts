@@ -9,6 +9,8 @@ import {
   sendTemplatedEmail,
 } from "../lib";
 
+import { currentSubscription, subscriptionView } from "../services/subscriptions";
+
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // GET /v1/payments/packages - List available subscription packages
@@ -50,37 +52,21 @@ app.get("/subscription", requireAuth, async (c) => {
   const user = c.get("user")!;
   try {
     const db = c.env.DB;
-    const row = await db
-      .prepare(
-        `SELECT us.*, p.name as package_name, p.validity_days, p.contact_limit
-         FROM user_subscriptions us
-         LEFT JOIN packages p ON us.package_id = p.id
-         WHERE us.user_id = ?
-         ORDER BY us.created_at DESC
-         LIMIT 1`
-      )
-      .bind(user.id)
-      .first<any>();
-
-    if (!row) {
-      return c.json({ success: true, subscription: null });
-    }
-
-    return c.json({
-      success: true,
-      subscription: {
-        ...row,
-        packageId: row.package_id,
-        planName: row.package_name,
-        renewalDate: row.end_date,
-        contactLimitBalance: row.contact_limit_balance,
-        isActive: row.status === "active" && new Date(row.end_date).getTime() > Date.now(),
-      },
-    });
+    const row = await currentSubscription(db,user.id);
+    return c.json({success:true,subscription:subscriptionView(row)});
   } catch (err: any) {
     console.error("[Payments] Get subscription error:", err);
     return c.json({ error: err?.message || "Server Error" }, 500);
   }
+});
+
+// GET /v1/payments/credits — bounded history owned by the authenticated member.
+app.get('/credits', requireAuth, async c => {
+  const user = c.get('user')!;
+  const rows = await c.env.DB.prepare(`SELECT l.id,l.subscription_id,l.amount,l.balance_after,l.reason,l.created_at,
+    cu.unlocked_user_id AS profileId FROM credit_ledger l LEFT JOIN contact_unlocks cu ON cu.id = l.unlock_id
+    WHERE l.user_id = ? ORDER BY l.id DESC LIMIT 100`).bind(user.id).all();
+  return c.json({success:true,credits:rows.results || []});
 });
 
 async function getCmsSetting(db: D1Database, key: string, fallback = ""): Promise<string> {
@@ -333,6 +319,7 @@ async function resolvePackageIdForOrder(
 
 // POST /v1/payments/verify - Client-side payment signature verification
 app.post("/verify", requireAuth, async (c) => {
+  if(!await isRazorpayEnabled(c.env.DB))return c.json({error:"Please contact support about this payment."},403);
   const user = c.get("user")!;
   try {
     const { orderId, paymentId, signature, packageId: clientPackageId } = await c.req.json();

@@ -1,3 +1,4 @@
+import {signProfilePhotos} from "../services/media-access";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -14,17 +15,21 @@ app.get("/", requireAuth, async (c) => {
     const rows = await db
       .prepare(
         `SELECT f.created_at as favorited_at, p.user_id, p.gender, p.age, p.height, p.marital_status,
-                p.religion, p.caste, p.highest_degree, p.occupation, p.annual_income, p.work_location,
-                p.city, p.state, p.country, p.photos, p.is_verified, p.is_featured, p.about_me, p.last_active_at
+                p.full_name, p.religion, p.caste, p.highest_degree, p.occupation, CASE WHEN privacy.hide_income = 1 THEN NULL ELSE p.annual_income END AS annual_income, p.work_location,
+                p.city, p.state, p.country, CASE WHEN privacy.photo_visibility IN ('private','premium') THEN '[]' ELSE p.photos END AS photos, p.is_verified, p.is_featured, p.about_me, p.last_active_at
          FROM favorites f
          LEFT JOIN profiles p ON f.favorited_user_id = p.user_id
-         WHERE f.user_id = ?
+         JOIN users u ON u.id = p.user_id
+         LEFT JOIN user_settings privacy ON privacy.user_id = p.user_id
+         WHERE f.user_id = ? AND u.status = 'active' AND COALESCE(privacy.hide_profile,0) = 0
+           AND NOT EXISTS (SELECT 1 FROM blocked_users b WHERE
+             (b.blocker_id=f.user_id AND b.blocked_id=p.user_id) OR (b.blocked_id=f.user_id AND b.blocker_id=p.user_id))
          ORDER BY f.created_at DESC`
       )
       .bind(user.id)
       .all();
 
-    const results = (rows.results || []).map((row: any) => ({ ...row, photos: parsePhotos(row.photos) }));
+    const results = await Promise.all((rows.results || []).map((row: any) => signProfilePhotos({...row,photos:parsePhotos(row.photos)},user.id,c.env,c.req.url)));
 
     return c.json({ success: true, favorites: results });
   } catch (err: any) {
@@ -48,6 +53,11 @@ app.post("/", requireAuth, async (c) => {
 
     const db = c.env.DB;
 
+    const target = await db.prepare(`SELECT u.id FROM users u LEFT JOIN user_settings s ON s.user_id=u.id
+      WHERE u.id=? AND u.status='active' AND COALESCE(s.hide_profile,0)=0
+        AND NOT EXISTS(SELECT 1 FROM blocked_users WHERE (blocker_id=? AND blocked_id=u.id) OR (blocked_id=? AND blocker_id=u.id))`)
+      .bind(favoritedUserId,user.id,user.id).first();
+    if(!target)return c.json({error:'This profile is unavailable.'},404);
     await db
       .prepare(
         `INSERT INTO favorites (user_id, favorited_user_id)

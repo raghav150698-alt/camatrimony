@@ -136,7 +136,7 @@ export async function verifyFirebaseToken(
     }
 
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
+    if (header.alg !== "RS256" || !header.kid || !payload.sub || !Number.isFinite(payload.exp) || !Number.isFinite(payload.iat) || payload.iat > now + 60 || payload.exp <= now) {
       console.error("JWT token expired");
       return null;
     }

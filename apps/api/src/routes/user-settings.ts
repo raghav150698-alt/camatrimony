@@ -182,6 +182,7 @@ app.delete("/account", requireAuth, async (c) => {
     await db.prepare("DELETE FROM interest_requests WHERE sender_id = ? OR receiver_id = ?").bind(userId, userId).run();
     await db.prepare("DELETE FROM favorites WHERE user_id = ? OR favorited_user_id = ?").bind(userId, userId).run();
     await db.prepare("DELETE FROM notifications WHERE user_id = ?").bind(userId).run();
+    await db.prepare("DELETE FROM credit_ledger WHERE user_id = ?").bind(userId).run();
     await db.prepare("DELETE FROM contact_unlocks WHERE user_id = ? OR unlocked_user_id = ?").bind(userId, userId).run();
     await db.prepare("DELETE FROM reports WHERE reporter_id = ? OR reported_id = ?").bind(userId, userId).run();
     await db.prepare("DELETE FROM blocked_users WHERE blocker_id = ? OR blocked_id = ?").bind(userId, userId).run();

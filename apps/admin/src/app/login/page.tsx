@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck, AlertCircle, Eye, EyeOff, Clock } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 
+import {usesSupabaseAuth} from "@camatrimony/auth/client";
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const { session, login } = useAdminAuth();
@@ -148,7 +150,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={loading || isLocked}
                 className="w-full bg-white/[0.06] border border-white/10 text-white placeholder-white/25 px-4 py-3 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-maroon-500/60 focus:border-maroon-500/40 transition-all disabled:opacity-50"
-                placeholder="Enter admin username"
+                placeholder={usesSupabaseAuth ? "admin@example.com" : "Enter admin username"}
               />
             </div>
 

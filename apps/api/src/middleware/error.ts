@@ -1,3 +1,4 @@
+import { HTTPException } from "hono/http-exception";
 import type { Context } from "hono";
 import type { Env, HonoVariables } from "../types";
 
@@ -9,7 +10,8 @@ type AppContext = Context<{ Bindings: Env; Variables: HonoVariables }>;
  */
 export const errorHandler = (err: Error, c: AppContext) => {
   console.error("[API Error]", err);
-  return c.json({ error: err?.message || "Internal Server Error" }, 500);
+  if (err instanceof HTTPException) return c.json({success:false,error:err.message},err.status);
+  return c.json({success:false,error:"The service is temporarily unavailable. Please try again."},500);
 };
 
 /**

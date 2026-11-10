@@ -1,3 +1,4 @@
+import {subscriptionView} from "../../services/subscriptions";
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../../types";
 import { requireAdmin } from "../../middleware/auth";
@@ -22,7 +23,7 @@ app.get("/", requireAdmin, async (c) => {
       )
       .all();
 
-    return c.json({ success: true, subscriptions: rows.results || [] });
+    return c.json({ success: true, subscriptions: (rows.results || []).map((row:any)=>({...subscriptionView({...row,package_name:row.plan_name}),recordedContactBalance:row.contact_limit_balance})) });
   } catch (err: any) {
     return c.json({ error: err?.message || "Server Error" }, 500);
   }
@@ -46,7 +47,7 @@ app.post("/", requireAdmin, async (c) => {
     const db = c.env.DB;
 
     const pkg = await db
-      .prepare("SELECT * FROM packages WHERE id = ?")
+      .prepare("SELECT * FROM packages WHERE id = ? AND is_active = 1")
       .bind(Number(packageId))
       .first<{ id: number; name: string; validity_days: number; contact_limit: number; price: number }>();
 
@@ -64,15 +65,16 @@ app.post("/", requireAdmin, async (c) => {
     }
 
     const days = validityDays ? Number(validityDays) : pkg.validity_days;
-    if (!days || days < 1 || !Number.isFinite(days)) {
-      return c.json({ error: "Plan period must be at least 1 day." }, 400);
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      return c.json({ error: "Plan period must be a whole number between 1 and 3650 days." }, 400);
     }
 
     let start: Date;
     if (startDate && String(startDate).trim()) {
-      const datePart = String(startDate).trim().slice(0, 10);
+      const datePart = String(startDate).trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return c.json({error:"Invalid plan start date."},400);
       start = new Date(`${datePart}T00:00:00.000Z`);
-      if (Number.isNaN(start.getTime())) {
+      if (Number.isNaN(start.getTime()) || start.toISOString().slice(0,10) !== datePart) {
         return c.json({ error: "Invalid plan start date." }, 400);
       }
     } else {
@@ -83,47 +85,20 @@ app.post("/", requireAdmin, async (c) => {
     const endDate = new Date(start.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
     // Synthetic payment row so user_subscriptions.payment_id FK (→ payments.id) stays valid.
-    const offlinePaymentId = `offline_admin_${String(userId).slice(0, 8)}_${Date.now()}`;
-    const offlineOrderId = `offline_order_${Date.now()}`;
+    const offlinePaymentId = `offline_admin_${crypto.randomUUID()}`;
+    const offlineOrderId = `offline_order_${crypto.randomUUID()}`;
     const amountPaise = Math.round(Number(pkg.price || 0) * 100);
-    await db
-      .prepare(
-        `INSERT INTO payments (id, user_id, package_id, amount, status, order_id, payment_method, proof_url, admin_notes, verified_by, verified_at)
-         VALUES (?, ?, ?, ?, 'captured', ?, 'offline_admin', ?, ?, ?, ?)`
-      )
-      .bind(
-        offlinePaymentId,
-        userId,
-        pkg.id,
-        amountPaise,
-        offlineOrderId,
-        String(proofUrl).trim(),
-        adminNotes ? String(adminNotes).trim() : null,
-        admin.id,
-        startDateIso
-      )
-      .run();
-
-    await db
-      .prepare("UPDATE user_subscriptions SET status = 'cancelled' WHERE user_id = ? AND status = 'active'")
-      .bind(userId)
-      .run();
-
-    await db
-      .prepare(
-        `INSERT INTO user_subscriptions (user_id, package_id, start_date, end_date, status, payment_id, contact_limit_balance)
-         VALUES (?, ?, ?, ?, 'active', ?, ?)`
-      )
-      .bind(userId, pkg.id, startDateIso, endDate, offlinePaymentId, pkg.contact_limit || 0)
-      .run();
-
-    await db
-      .prepare(
-        `INSERT INTO notifications (user_id, type, title, body, reference_id)
-         VALUES (?, 'payment', 'Subscription Plan Activated! 🌟', ?, ?)`
-      )
-      .bind(userId, `An administrator has manually assigned you the ${pkg.name} package. Enjoy your premium benefits!`, pkg.id.toString())
-      .run();
+    await db.batch([
+      db.prepare(`INSERT INTO payments (id,user_id,package_id,amount,status,order_id,payment_method,proof_url,admin_notes,verified_by,verified_at)
+        VALUES(?,?,?,?,'captured',?,'offline_admin',?,?,?,?)`)
+        .bind(offlinePaymentId,userId,pkg.id,amountPaise,offlineOrderId,String(proofUrl).trim(),adminNotes ? String(adminNotes).trim() : null,admin.id,startDateIso),
+      db.prepare(`UPDATE user_subscriptions SET status = 'cancelled' WHERE user_id = ? AND status = 'active'
+        AND julianday(?) <= julianday('now')`).bind(userId,startDateIso),
+      db.prepare(`INSERT INTO user_subscriptions(user_id,package_id,start_date,end_date,status,payment_id,contact_limit_balance)
+        VALUES(?,?,?,?,'active',?,?)`).bind(userId,pkg.id,startDateIso,endDate,offlinePaymentId,pkg.contact_limit || 0),
+      db.prepare(`INSERT INTO notifications(user_id,type,title,body,reference_id) VALUES(?,'payment','Membership updated',?,?)`)
+        .bind(userId,`${pkg.name}: ${pkg.contact_limit} contact credits, valid until ${endDate.slice(0,10)}.`,String(pkg.id)),
+    ]);
 
     await logAdminAudit(db, admin, {
       action_type: "PLAN_ASSIGN",
@@ -175,10 +150,14 @@ app.patch("/", requireAdmin, async (c) => {
         .bind(admin.id, sub.user_id, JSON.stringify({ action: "Subscription Cancelled By Admin", subscriptionId }))
         .run();
     } else if (action === "extend") {
-      if (!extendDays || Number(extendDays) <= 0) {
+      if (!Number.isInteger(Number(extendDays)) || Number(extendDays) <= 0 || Number(extendDays) > 3650) {
         return c.json({ error: "Provide positive extension days count" }, 400);
       }
 
+      if(sub.status === 'cancelled') return c.json({error:'A cancelled membership cannot be extended. Assign a new plan.'},409);
+      const other = await db.prepare(`SELECT id FROM user_subscriptions WHERE user_id = ? AND status = 'active' AND id != ?
+        AND julianday(end_date) > julianday('now')`).bind(sub.user_id,sub.id).first();
+      if(other) return c.json({error:'Another membership is active or scheduled. Update that membership instead.'},409);
       const currentExpiry = new Date(sub.end_date);
       const baseDate = currentExpiry.getTime() > Date.now() ? currentExpiry : new Date();
       const newExpiry = new Date(baseDate.getTime() + Number(extendDays) * 24 * 60 * 60 * 1000).toISOString();

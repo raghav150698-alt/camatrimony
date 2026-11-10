@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { extractMediaKey, getAdminToken, getBaseUrl } from "@/lib/admin-api-client";
+import { extractMediaKey, getAdminAuthHeaders, getBaseUrl } from "@/lib/admin-api-client";
 
 interface AdminSecureMediaProps {
   url: string | null | undefined;
@@ -37,11 +37,11 @@ export default function AdminSecureMedia({
       }
 
       try {
-        const token = getAdminToken();
+        const headers = await getAdminAuthHeaders();
         const res = await fetch(
           `${getBaseUrl()}/admin/media?key=${encodeURIComponent(key)}`,
           {
-            headers: token ? { "x-admin-token": token } : {},
+            headers,
           }
         );
 

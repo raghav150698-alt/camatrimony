@@ -48,3 +48,11 @@ API integration checks require the seeded local API; see the scripts and [review
 The Vercel review project does not deploy the Cloudflare API or change the live domain. Before production rollout, back up D1, review pending migrations, configure production secrets and exercise real authentication and payment flows.
 
 API defaults are production-safe. Set local overrides in ignored `apps/api/.dev.vars`. Store `ADMIN_JWT_SECRET`, payment and email credentials in the platform secret store, never in Git. The existing Cloudflare web deployment script still requires modernization before production use.
+
+## Authentication and launch preparation
+
+The target backend stays on Cloudflare D1/R2/Workers. Supabase authentication support is implemented for both members and administrators. The current live provider is intentionally retained until OAuth/SMS configuration, existing-user mapping and real sign-in checks are complete. See [auth cutover](review-artifacts/AUTH_CUTOVER.md).
+
+Membership credits are stored in D1. Contact unlocks, credit deductions and ledger entries are atomic; repeated unlocks are free, future plans cannot spend early and expired plans expose zero available credits. The membership page shows balance, dates and activity. Preview uses fictional credits and `.test` contacts only.
+
+Run `pnpm test:platform` for shared and API regressions using an isolated SQLite database. Run `sh scripts/validate-cloudflare.sh` on Linux for Cloudflare production packaging and SEO validation. The web/admin deployment adapter is OpenNext; the deprecated next-on-pages commands have been removed. Build output and private migration exports are ignored by Git. Deployment/migration commands must target the verified client Cloudflare account after backup.
