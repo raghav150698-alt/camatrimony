@@ -382,7 +382,7 @@ function ChatPageContent() {
                     }`}
                   >
                     <div className="relative w-12 h-12 rounded-2xl overflow-hidden border border-gold-500 bg-slate-200 flex-shrink-0">
-                      <Image src={chan.avatar} alt={chan.name} fill sizes="48px" className="object-contain" />
+                      <Image src={chan.avatar} alt={chan.name} fill sizes="48px" className="object-cover" />
                     </div>
 
                     <div className="flex-grow min-w-0">
@@ -408,7 +408,7 @@ function ChatPageContent() {
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
                   <div className="flex items-center gap-3">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-gold-500">
-                      <Image src={activeChannel.avatar} alt={activeChannel.name} fill sizes="40px" className="object-contain" />
+                      <Image src={activeChannel.avatar} alt={activeChannel.name} fill sizes="40px" className="object-cover" />
                     </div>
                     <div>
                       <span className="font-extrabold text-sm text-slate-900 dark:text-white block">{activeChannel.name}</span>
@@ -496,7 +496,7 @@ function ChatPageContent() {
               <>
                 <div className="space-y-6 w-full">
                   <div className="relative w-24 h-24 rounded-3xl overflow-hidden border-2 border-gold-500 mx-auto shadow-md">
-                    <Image src={activeChannel.avatar} alt={activeChannel.name} fill sizes="96px" className="object-contain" />
+                    <Image src={activeChannel.avatar} alt={activeChannel.name} fill sizes="96px" className="object-cover" />
                   </div>
 
                   <div>
