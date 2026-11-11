@@ -56,7 +56,7 @@ export default function RefundPolicyPage() {
             <div className="space-y-3">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">4. Refund Processing Timeline</h2>
               <p>
-                If your refund request is approved by our billing committee, the refund will be processed back to the original payment source (UPI, Credit/Debit Card, or NetBanking) via Razorpay. It typically takes <strong>5 to 7 working days</strong> for the refunded sum to reflect in your bank statement.
+                If your refund request is approved, our team will confirm the refund method and expected processing time with you by email.
               </p>
             </div>
 
@@ -67,7 +67,7 @@ export default function RefundPolicyPage() {
                 <a href="mailto:support@camatrimonybncn.com?subject=Refund%20Request" className="text-maroon-500 dark:text-maroon-400 font-semibold hover:underline">
                   support@camatrimonybncn.com
                 </a>{" "}
-                with your registered Mobile Number, Registered Email, Razorpay Order ID, Payment ID, and payment receipt screenshots.
+                with your registered email, membership details and payment reference or receipt, if applicable.
               </p>
             </div>
           </div>

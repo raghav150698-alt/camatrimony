@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
+export { RateLimiterDO } from './do/rate-limiter';
 
 import type { Env, HonoVariables } from "./types";
 import { corsMiddleware } from "./middleware/cors";

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { rateLimit } from '../../middleware/rate-limit';
 import type { Env, HonoVariables } from "../../types";
 import { requirePermission } from "../../middleware/auth";
 import { sendTemplatedEmail, type EmailTemplate } from "../../lib";
@@ -27,7 +28,7 @@ app.get("/", requirePermission("communication"), async (c) => {
 });
 
 // POST /v1/admin/communication - Create/broadcast an announcement
-app.post("/", requirePermission("communication"), async (c) => {
+app.post("/", requirePermission("communication"), rateLimit({windowMs: 300000, max: 1, keyBy: 'user'}), async (c) => {
   const admin = c.get("user")!;
 
   try {

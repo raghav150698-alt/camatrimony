@@ -1,4 +1,5 @@
 ENVIRONMENT=development
+SUBSCRIPTION_MODE=contact
 LOCAL_REVIEW_AUTH=false
 AUTH_PROVIDER=supabase
 SUPABASE_URL=https://ulwijnfaktabzhhvuvyv.supabase.co

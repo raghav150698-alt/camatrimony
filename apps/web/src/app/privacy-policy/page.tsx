@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc pl-5 space-y-2">
                 <li>Auditing uploaded credentials to award profile verified badges.</li>
                 <li>Displaying candidate summaries to other logged-in, authenticated members.</li>
-                <li>Processing secure subscription payment orders using Razorpay.</li>
+                <li>Managing subscription enquiries, memberships and payment records.</li>
                 <li>Maintaining secure in-app text chats and preventing duplicate contact deductions.</li>
                 <li>Contacting you with match recommendations and email status alerts.</li>
               </ul>
@@ -63,7 +63,7 @@ export default function PrivacyPolicyPage() {
                   <strong>To Other Members:</strong> Basic bio summaries (Age, Caste, Education, Location) are displayed on the platform. Media assets are shown according to your custom photo privacy filters (Public, Matches only, or Password-protected).
                 </li>
                 <li>
-                  <strong>Payment Processors:</strong> Necessary payment data is passed securely to Razorpay.
+                  <strong>Membership Support:</strong> Subscription enquiries and payment records are accessible to authorized staff handling your membership.
                 </li>
                 <li>
                   <strong>Legal Requirements:</strong> We will disclose your information if requested under state laws, standard judicial orders, or to protect the safety of our members.

@@ -157,7 +157,7 @@ app.post("/", requireAuth, async (c) => {
       apiBase
     );
 
-    console.log(`[R2 UPLOAD SUCCESS] Uploaded file "${file.name}" to R2 key: ${r2Key}`);
+    console.log(`[R2] ${type} upload completed`);
 
     // Profile photos enter the admin moderation queue as pending
     if (type === "photos") {

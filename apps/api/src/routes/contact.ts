@@ -1,16 +1,20 @@
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
+import { rateLimit } from '../middleware/rate-limit';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // POST /v1/contact - Contact form submission, saves to contact_submissions table
-app.post("/", async (c) => {
+app.post("/", rateLimit({windowMs: 3600000, max: 5}), async (c) => {
   try {
     const { name, email, phone, subject, message } = await c.req.json();
 
     if (!name || !email || !subject || !message) {
       return c.json({ error: "name, email, subject, and message are required" }, 400);
     }
+    if (typeof name !== 'string' || name.length > 100 || typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      || typeof subject !== 'string' || subject.length > 200 || typeof message !== 'string' || message.trim().length < 10 || message.length > 3000
+      || (phone != null && (typeof phone !== 'string' || phone.length > 25))) return c.json({error:'Please check your message and contact details.'},400);
 
     const db = c.env.DB;
 

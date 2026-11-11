@@ -7,7 +7,7 @@ const require=createRequire(realpathSync(resolve('apps/api/node_modules/wrangler
 const {build}=require('esbuild');
 const built=await build({entryPoints:['apps/api/src/index.ts'],bundle:true,platform:'neutral',mainFields:['module','main'],conditions:['worker','browser'],format:'esm',write:false});
 writeFileSync('review-artifacts/api-test-bundle.mjs',built.outputFiles[0].text);
-const {default:app}=await import('../review-artifacts/api-test-bundle.mjs?'+Date.now());
+const {default:app,RateLimiterDO}=await import('../review-artifacts/api-test-bundle.mjs?'+Date.now());
 const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');
 for(const name of readdirSync('migrations').filter(n=>n.endsWith('.sql')).sort()){
   try{sql.exec(readFileSync('migrations/'+name,'utf8'));}catch(error){throw new Error(`Migration ${name}: ${error.message}`);}
@@ -190,5 +190,48 @@ await check('staff role grants and revocations apply to Supabase sessions immedi
   assert.equal((await req('/admin/packages','POST',{name:'Denied',price:1,validityDays:1,contactLimit:1},'outsider')).status,403);
   assert.equal((await req('/admin/roles','POST',{action:'revokeAdmin',targetUserId:'outsider'},'admin')).status,200);
   assert.equal((await req('/admin/auth/validate','GET',undefined,'outsider')).status,401);
+});
+await check('contact subscriptions hide checkout details and reject new payment submissions',async()=>{
+  env.SUBSCRIPTION_MODE='contact';
+  try {
+    const settings=await req('/payments/settings','GET',undefined,'');
+    assert.equal(settings.body.subscriptionEmail,'support@camatrimonybncn.com');
+    assert.equal(settings.body.razorpayEnabled,false);
+    assert.equal(settings.body.manualPaymentEnabled,false);
+    assert.equal(settings.body.bankAccountDetails,'');
+    for(const route of ['/payments/create-order','/payments/manual-proof']) {
+      const result=await req(route,'POST',{packageId:Number(pkg),proofUrl:'unused'});
+      assert.equal(result.status,403);
+      assert.match(result.body.error,/email support@camatrimonybncn.com/);
+    }
+    assert.equal((await req('/payments/subscription')).status,200);
+    assert.equal((await req('/payments/credits')).status,200);
+  } finally { delete env.SUBSCRIPTION_MODE; }
+});
+await check('own report history does not expose another member contact email',async()=>{
+  assert.equal((await req('/reports','POST',{reportedId:'target2',reason:'Fixture review',details:'Fixture only'})).status,200);
+  const result=await req('/reports');assert.equal(result.status,200);assert.ok(result.body.reports.length);
+  assert.ok(result.body.reports.every(report=>!('reported_email' in report)&&!('email' in report)));
+  assert.equal((await req('/reports','GET',undefined,'outsider')).body.reports.length,0);
+});
+await check('deployed SQLite limiter enforces concurrent limits and expires counters',async()=>{
+  let alarm=null;let now=Date.now();const originalNow=Date.now;Date.now=()=>now;
+  const limiter=new RateLimiterDO({storage:{sql:{exec(query,...args){const rows=sql.prepare(query).all(...args);return {toArray:()=>rows};}},getAlarm:async()=>alarm,setAlarm:async value=>{alarm=value;}}});
+  const call=()=>limiter.fetch(new Request('https://limiter.test',{method:'POST',body:JSON.stringify({key:'fixture',windowMs:1000,max:2})})).then(r=>r.json());
+  try {
+    const results=await Promise.all([call(),call(),call()]);assert.equal(results.filter(r=>r.allowed).length,2);
+    now+=1001;assert.equal((await call()).allowed,true);
+    now+=1001;await limiter.alarm();assert.equal(sql.prepare('SELECT COUNT(*) n FROM counters').get().n,0);
+    assert.equal((await limiter.fetch(new Request('https://limiter.test',{method:'POST',body:JSON.stringify({key:'bad',windowMs:-1,max:2})}))).status,400);
+  } finally { Date.now=originalNow; }
+});
+await check('rate-limit middleware uses trusted IP, denies excess requests and fails closed on outages',async()=>{
+  let key='';env.RATE_LIMITER={idFromName:value=>(key=value),get:()=>({fetch:async()=>Response.json({allowed:false,resetAt:Date.now()+60000})})};
+  try {
+    const denied=await app.request('https://api.example.test/v1/contact',{method:'POST',headers:{'cf-connecting-ip':'192.0.2.10','x-forwarded-for':'spoofed'}},env);
+    assert.equal(denied.status,429);assert.ok(Number(denied.headers.get('retry-after'))>0);assert.match(key,/192\.0\.2\.10$/);assert.doesNotMatch(key,/spoofed/);
+    env.RATE_LIMITER.get=()=>({fetch:async()=>{throw new Error('outage');}});
+    assert.equal((await req('/admin/auth','POST',{username:'fixture',password:'unused'},'')).status,503);
+  } finally {delete env.RATE_LIMITER;}
 });
 console.log(`Completed ${count} integration regressions against an isolated SQLite database.`);

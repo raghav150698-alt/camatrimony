@@ -60,7 +60,7 @@ app.get("/subscription", requireAuth, async (c) => {
   }
 });
 
-// GET /v1/payments/credits — bounded history owned by the authenticated member.
+// GET /v1/payments/credits - bounded history owned by the authenticated member.
 app.get('/credits', requireAuth, async c => {
   const user = c.get('user')!;
   const rows = await c.env.DB.prepare(`SELECT l.id,l.subscription_id,l.amount,l.balance_after,l.reason,l.created_at,
@@ -94,6 +94,12 @@ function isTruthySetting(val: string): boolean {
 app.get("/settings", async (c) => {
   try {
     const db = c.env.DB;
+    if (c.env.SUBSCRIPTION_MODE === "contact") {
+      return c.json({success: true, subscriptionMode: "contact", subscriptionEmail: "support@camatrimonybncn.com",
+        razorpayEnabled: false, razorpayKeyId: null, manualPaymentEnabled: false,
+        upiId: "", upiQrUrl: "", paymentInstructions: "", bankAccountDetails: "",
+        astrologyMatchEnabled: isTruthySetting(await getCmsSetting(db, "astrology_match_enabled", "1"))});
+    }
     const [
       razorpayEnabled,
       manualPaymentEnabled,
@@ -139,6 +145,7 @@ app.get("/settings", async (c) => {
  * Creates a pending_verification payment for admin review.
  */
 app.post("/manual-proof", requireAuth, async (c) => {
+  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email support@camatrimonybncn.com."},403);
   const user = c.get("user")!;
   try {
     const body = await c.req.json();
@@ -201,6 +208,7 @@ app.post("/manual-proof", requireAuth, async (c) => {
 
 // POST /v1/payments/create-order - Create a Razorpay order for the authenticated user
 app.post("/create-order", requireAuth, async (c) => {
+  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email support@camatrimonybncn.com."},403);
   try {
     const user = c.get("user")!;
     const body = await c.req.json();
@@ -216,7 +224,7 @@ app.post("/create-order", requireAuth, async (c) => {
       return c.json(
         {
           error:
-            "Online payments are temporarily disabled. Please contact support or ask an admin to activate your plan.",
+            "For subscriptions, email support@camatrimonybncn.com.",
         },
         403
       );

@@ -20,12 +20,14 @@ export interface AuthAdmin {
 export interface Env {
   DB: D1Database;
   BUCKET: R2Bucket;
+  RATE_LIMITER?: DurableObjectNamespace;
   CORS_ORIGIN: string;
   ENVIRONMENT?: string;
   LOCAL_REVIEW_AUTH?: string;
   /** Absolute API base including `/v1`, e.g. https://…workers.dev/v1 */
   PUBLIC_API_BASE?: string;
   AUTH_PROVIDER?: "firebase" | "supabase";
+  SUBSCRIPTION_MODE?: "contact" | "checkout";
   MEDIA_SIGNING_SECRET?: string;
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;

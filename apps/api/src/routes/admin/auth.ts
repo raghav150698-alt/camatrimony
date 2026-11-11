@@ -3,13 +3,14 @@ import type { Env, HonoVariables } from "../../types";
 import { generateAdminToken, hashToken } from "../../middleware/admin-auth";
 import {getAdminUser} from "../../middleware/auth";
 import { verifyPassword } from "../../lib/password";
+import { rateLimit } from '../../middleware/rate-limit';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // POST /v1/admin/auth - Validates admin username + password and returns a session token
 // CRITICAL FIX: Remove hardcoded credentials, use admin_accounts table from D1,
 // generate HMAC-SHA256 session token using ADMIN_JWT_SECRET, store session in admin_sessions table
-app.post("/", async (c) => {
+app.post("/", rateLimit({windowMs: 900000, max: 5, message: 'Too many login attempts. Try again in 15 minutes.'}), async (c) => {
   if(c.env.AUTH_PROVIDER === "supabase") return c.json({success:false,message:"Please sign in with your administrator email."},401);
   try {
     const body = await c.req.json();

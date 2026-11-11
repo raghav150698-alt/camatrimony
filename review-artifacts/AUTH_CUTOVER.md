@@ -2,6 +2,8 @@
 
 Target: Cloudflare D1, R2 and Hono API; Supabase handles member and administrator authentication only. No product tables or files move to Supabase.
 
+Release status, 11 November 2026: Cloudflare deployments and D1 migrations 0012–0015 are complete. Production deliberately retains Firebase and the existing admin login until the provider setup, trusted identity links and real-account tests below are complete. Supabase Google was still disabled with blank credentials during the release check. The new UI must not be mistaken for a completed authentication migration.
+
 ## Before switching authentication
 
 1. Client Supabase project: `ulwijnfaktabzhhvuvyv`. Enable Google with the client's OAuth credentials and callback `https://ulwijnfaktabzhhvuvyv.supabase.co/auth/v1/callback`. Configure SMS provider for phone OTP. Keep anonymous sign-in disabled and email confirmation enabled.

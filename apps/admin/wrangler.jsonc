@@ -7,6 +7,7 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "routes": [{ "pattern": "admin.camatrimonybncn.com/*", "zone_name": "camatrimonybncn.com" }],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

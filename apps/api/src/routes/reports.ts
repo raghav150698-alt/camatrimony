@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env, HonoVariables } from "../types";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit } from '../middleware/rate-limit';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -12,9 +13,8 @@ app.get("/", requireAuth, async (c) => {
     const db = c.env.DB;
     const rows = await db
       .prepare(
-        `SELECT r.*, u.email as reported_email
+        `SELECT r.*
          FROM reports r
-         LEFT JOIN users u ON r.reported_id = u.id
          WHERE r.reporter_id = ?
          ORDER BY r.created_at DESC`
       )
@@ -28,7 +28,7 @@ app.get("/", requireAuth, async (c) => {
 });
 
 // POST /v1/reports - Submit a report against a user
-app.post("/", requireAuth, async (c) => {
+app.post("/", requireAuth, rateLimit({windowMs: 3600000, max: 10, keyBy: 'user'}), async (c) => {
   const user = c.get("user")!;
 
   try {

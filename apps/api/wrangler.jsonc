@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-07-01",
   "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "RATE_LIMITER", "class_name": "RateLimiterDO" }]
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -21,7 +24,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "AUTH_PROVIDER": "firebase",
-    "CORS_ORIGIN": "https://camatrimonybncn.com,https://admin.camatrimonybncn.com,https://camatrimony-web.pages.dev,https://camatrimony-admin.pages.dev,https://*.camatrimony-web.pages.dev,https://*.camatrimony-admin.pages.dev,http://localhost:3000,http://localhost:3001",
+    "SUBSCRIPTION_MODE": "contact",
+    "CORS_ORIGIN": "https://camatrimonybncn.com,https://admin.camatrimonybncn.com,https://camatrimony-web.pages.dev,https://camatrimony-admin.pages.dev,https://camatrimony-web.gentle-mode-2ab9.workers.dev,https://camatrimony-admin.gentle-mode-2ab9.workers.dev,https://*.camatrimony-web.pages.dev,https://*.camatrimony-admin.pages.dev,http://localhost:3000,http://localhost:3001",
     "FIREBASE_PROJECT_ID": "ca-matrimony-bncn",
     "PUBLIC_API_BASE": "https://camatrimony-api.gentle-mode-2ab9.workers.dev/v1"
   }
