@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Check, ChevronDown, Heart, LockKeyhole, MapPin, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Heart, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 import type { PreferenceMatch } from "@camatrimony/shared";
-import { getProfileDisplayName, getProfilePhotoSrc, LOCKED_PHOTO_BLUR_CLASS, type ProfileLike } from "@/lib/profile-display";
+import { getProfileDisplayName, getProfilePhotoSrc, type ProfileLike } from "@/lib/profile-display";
 
 interface MatchCardProfile extends ProfileLike {
   userId: string; age: number; height: string; caste: string;
@@ -20,13 +20,12 @@ export default function MatchCard({ profile, rank, unlocked, saved, pending, acc
   return <article className="match-card group overflow-hidden rounded-2xl border border-[#e8e1d8] bg-[#fffefa] transition-shadow hover:shadow-[0_12px_32px_-14px_#6d4d3033]">
     <div className="relative aspect-[1.8] md:aspect-[1.45] overflow-hidden bg-[#e5e0d9]">
       <Link href={`/profile?id=${encodeURIComponent(profile.userId)}`} aria-label={`View ${name}'s profile`} className="block h-full">
-          <img src={getProfilePhotoSrc(profile, unlocked)} alt={`${name}, ${profile.occupation}`} className={`h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-[1.03] ${!unlocked ? LOCKED_PHOTO_BLUR_CLASS : ""}`} onError={e => { e.currentTarget.style.display = "none"; }} />
+          <img src={getProfilePhotoSrc(profile, true)} alt={`${name}, ${profile.occupation}`} className="h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-[1.03]" onError={e => { e.currentTarget.style.display = "none"; }} />
       </Link>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/5" />
       {rank && rank <= 3 ? <span className="absolute left-4 top-4 rounded-full border border-white/60 bg-[#fffefa]/95 px-2.5 py-1 text-[10px] font-semibold text-[#70552e]">#{rank} for you</span> : null}
       <button disabled={busy} aria-label={`${saved ? "Remove" : "Save"} ${name}`} aria-pressed={saved} onClick={onSave} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-[#702c36] shadow-sm transition-transform hover:scale-105 disabled:opacity-50"><Heart size={17} strokeWidth={1.6} fill={saved ? "currentColor" : "none"} /></button>
       <span className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-black/20 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">{profile.isVerified ? <><ShieldCheck size={13} />Verified profile</> : <>Verification pending</>}</span>
-      {!unlocked && <span className="absolute bottom-4 right-4 flex items-center gap-1 text-[10px] text-white"><LockKeyhole size={12} />Photo preview</span>}
     </div>
     <div className="p-5">
       <div className="mb-2.5 flex items-start justify-between gap-2"><div><Link href={`/profile?id=${encodeURIComponent(profile.userId)}`} className="text-[19px] font-semibold tracking-tight text-[#302722] hover:text-[#702c36]">{name}</Link><p className="mt-1 text-xs text-[#76695e]">{profile.age} yrs <span className="mx-1.5 text-[#d4c8bb]">·</span>{profile.height}<span className="mx-1.5 text-[#d4c8bb]">·</span>{profile.caste}</p></div><span className="rounded-md bg-[#f3ecdf] px-2 py-1 text-[10px] font-bold text-[#8b6b36]">{degree}</span></div>

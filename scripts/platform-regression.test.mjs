@@ -234,4 +234,13 @@ await check('rate-limit middleware uses trusted IP, denies excess requests and f
     assert.equal((await req('/admin/auth','POST',{username:'fixture',password:'unused'},'')).status,503);
   } finally {delete env.RATE_LIMITER;}
 });
+await check('matches show member-visible photos before contact unlock without exposing address or contact details',async()=>{
+  sql.prepare("UPDATE profiles SET photos=?,address='Fixture street address' WHERE user_id='target2'").run(JSON.stringify(['https://api.example.test/v1/uploads?key=target2/photos/catalog.jpg']));
+  sql.exec("INSERT INTO user_settings(user_id,photo_visibility,hide_profile) VALUES('target2','members',0) ON CONFLICT(user_id) DO UPDATE SET photo_visibility='members',hide_profile=0");
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM contact_unlocks WHERE user_id='outsider' AND unlocked_user_id='target2'").get().n,0);
+  const result=await req('/profiles?gender=all&sortBy=recommended','GET',undefined,'outsider');
+  assert.equal(result.status,200);
+  const member=result.body.profiles.find(p=>p.userId==='target2');assert.ok(member);assert.equal(member.photos.length,1);
+  for(const key of ['address','email','phone','phoneNumber','govtIdFile','degreeFile','paymentProofUrl'])assert.ok(!(key in member),key+' must not appear in matches');
+});
 console.log(`Completed ${count} integration regressions against an isolated SQLite database.`);
