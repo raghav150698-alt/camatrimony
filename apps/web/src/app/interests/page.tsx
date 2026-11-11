@@ -244,7 +244,7 @@ export default function InterestsInboxPage() {
                       onClick={() => router.push(`/profile?id=${targetUser}`)}
                       className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 relative border border-slate-200 dark:border-slate-700 cursor-pointer"
                     >
-                      <img src={photoSrc} className={`w-full h-full object-cover ${!isAccepted ? "blur-sm" : ""}`} alt="" />
+                      <img src={photoSrc} className={`w-full h-full object-contain ${!isAccepted ? "blur-sm" : ""}`} alt="" />
                       {!isAccepted && (
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-white">
                           <Lock className="w-4 h-4 text-gold-500" />

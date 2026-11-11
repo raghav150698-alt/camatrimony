@@ -8,7 +8,8 @@ import Layout from "@/components/layout/Layout";
 import { useAuth } from "@/context/AuthContext";
 import { getProfileByUserId, getFavorites, addFavorite, removeFavorite, getUnlocks, unlockContact, getInterests, sendInterest, respondToInterest, getSubscription, blockUser, createReport, createMediationRequest } from "@camatrimony/api-client";
 import { computeSimpleAstrologyMatch, scorePreferenceMatch, type CandidateProfile } from "@camatrimony/shared";
-import { getProfileDisplayName, getProfilePhotoList, LOCKED_PHOTO_BLUR_CLASS } from "@/lib/profile-display";
+import { getProfileDisplayName, getProfilePhotoList } from "@/lib/profile-display";
+import PortraitGallery from '@/components/matches/PortraitGallery';
 
 type Profile = CandidateProfile & Record<string, unknown>;
 type Interest = { id: number; status: string; incoming: boolean };
@@ -30,7 +31,6 @@ function ProfileDetail() {
   const [interest, setInterest] = useState<Interest | null>(null);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
-  const [photoIndex, setPhotoIndex] = useState(0);
   const [dialog, setDialog] = useState<DialogName>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState("");
@@ -46,7 +46,7 @@ function ProfileDetail() {
   useEffect(() => {
     if (!user || !profileId || authLoading) return;
     let cancelled = false;
-    setLoading(true); setError(""); setPhotoIndex(0); setContact({}); setUnlocked(false); setInterest(null); setSaved(false); setBalance(0);
+    setLoading(true); setError(""); setContact({}); setUnlocked(false); setInterest(null); setSaved(false); setBalance(0);
     async function load() {
       try {
         const result = await getProfileByUserId(profileId);
@@ -123,9 +123,7 @@ function ProfileDetail() {
     <Link href="/dashboard" className="profile-back"><ArrowLeft size={16} />Back to matches</Link>
     {notice && <div role="status" className="app-notice">{notice}<button aria-label="Dismiss message" onClick={() => setNotice("")}><X size={16} /></button></div>}
     <div className="profile-overview">
-      <div className="profile-gallery"><div className="profile-main-photo"><img src={photos[photoIndex] || photos[0]} alt={`${name}'s profile photo`} className={!canSeePhoto ? LOCKED_PHOTO_BLUR_CLASS : ""} onError={e => { e.currentTarget.src = "/avatar-placeholder.svg"; }} />{!canSeePhoto && <span><LockKeyhole size={13} />Photo preview</span>}</div>
-        {photos.length > 1 && <div className="profile-thumbnails">{photos.map((photo, index) => <button key={`${photo}-${index}`} aria-label={`View photo ${index + 1}`} aria-pressed={photoIndex === index} onClick={() => setPhotoIndex(index)}><img src={photo} alt="" className={!canSeePhoto ? LOCKED_PHOTO_BLUR_CLASS : ""} /></button>)}</div>}
-      </div>
+      <PortraitGallery key={profileId} photos={photos} name={name} visible={canSeePhoto}/>
       <div className="profile-intro"><div className="profile-badges"><span>{text("highestDegree")}</span>{profile.isVerified && <span><ShieldCheck size={14} />Verified profile</span>}</div><h1>{name}</h1><p className="profile-intro-meta">{profile.age || "—"} years <span>·</span> {text("height")} <span>·</span> {text("caste")}</p><p className="profile-occupation">{text("occupation")}</p><p className="profile-location"><MapPin size={15} />{text("workLocation")}</p><p className="profile-about-short">{profile.aboutMe || "This member hasn’t added an introduction yet."}</p>
         <div className="profile-primary-actions">{self ? <Link href="/profile/edit" className="site-action">Edit your profile<ArrowUpRight size={16} /></Link> : <>
           {(interest?.status === "accepted" || unlocked) ? <Link className="site-action" href={`/chat?id=${encodeURIComponent(profileId)}`}><MessageCircle size={16} />Start a conversation</Link> : interest?.incoming && interest.status === "pending" ? <><button className="site-action" disabled={!!busy} onClick={async () => { if (await action("accept", () => respondToInterest(interest.id, "accepted"), "Interest accepted.")) setInterest({ ...interest, status: "accepted" }); }}>Accept interest</button><button className="site-action site-action-outline" disabled={!!busy} onClick={async () => { if (await action("decline", () => respondToInterest(interest.id, "declined"), "Interest declined.")) setInterest({ ...interest, status: "declined" }); }}>Decline</button></> : <button className="site-action" disabled={!!busy || interest?.status === "pending"} onClick={async () => { if (await action("interest", () => sendInterest(user.uid, profileId), "Interest sent.")) setInterest({ id: 0, status: "pending", incoming: false }); }}>{busy === "interest" ? "Sending…" : interest?.status === "pending" ? "Interest sent" : "Send interest"}</button>}

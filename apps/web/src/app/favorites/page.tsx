@@ -233,7 +233,7 @@ export default function FavoritesPage() {
                   <div className="relative aspect-square w-full bg-slate-200 dark:bg-slate-800 flex flex-col items-center justify-center overflow-hidden">
                     <img 
                       src={photoSrc} 
-                      className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${!isUnlocked ? "blur-md" : ""}`} 
+                      className={`w-full h-full object-contain p-3 ${!isUnlocked ? "blur-md" : ""}`}
                       alt="" 
                     />
 

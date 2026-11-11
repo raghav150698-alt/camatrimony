@@ -95,7 +95,7 @@ app.get("/settings", async (c) => {
   try {
     const db = c.env.DB;
     if (c.env.SUBSCRIPTION_MODE === "contact") {
-      return c.json({success: true, subscriptionMode: "contact", subscriptionEmail: "support@camatrimonybncn.com",
+      return c.json({success: true, subscriptionMode: "contact", subscriptionEmail: "admin@camatrimonybncn.com",
         razorpayEnabled: false, razorpayKeyId: null, manualPaymentEnabled: false,
         upiId: "", upiQrUrl: "", paymentInstructions: "", bankAccountDetails: "",
         astrologyMatchEnabled: isTruthySetting(await getCmsSetting(db, "astrology_match_enabled", "1"))});
@@ -145,7 +145,7 @@ app.get("/settings", async (c) => {
  * Creates a pending_verification payment for admin review.
  */
 app.post("/manual-proof", requireAuth, async (c) => {
-  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email support@camatrimonybncn.com."},403);
+  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email admin@camatrimonybncn.com."},403);
   const user = c.get("user")!;
   try {
     const body = await c.req.json();
@@ -208,7 +208,7 @@ app.post("/manual-proof", requireAuth, async (c) => {
 
 // POST /v1/payments/create-order - Create a Razorpay order for the authenticated user
 app.post("/create-order", requireAuth, async (c) => {
-  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email support@camatrimonybncn.com."},403);
+  if(c.env.SUBSCRIPTION_MODE === "contact") return c.json({error:"For subscriptions, email admin@camatrimonybncn.com."},403);
   try {
     const user = c.get("user")!;
     const body = await c.req.json();
@@ -224,7 +224,7 @@ app.post("/create-order", requireAuth, async (c) => {
       return c.json(
         {
           error:
-            "For subscriptions, email support@camatrimonybncn.com.",
+            "For subscriptions, email admin@camatrimonybncn.com.",
         },
         403
       );

@@ -50,7 +50,7 @@ export default function TermsAndConditionsPage() {
             <div className="space-y-3">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">4. Payment & Active Subscriptions</h2>
               <p>
-                For subscriptions, contact support@camatrimonybncn.com. All fees paid are subject to our Refund Policy. Contact credits are available during your membership validity. Previously unlocked contacts remain subject to member privacy settings.
+                For subscriptions, contact admin@camatrimonybncn.com. All fees paid are subject to our Refund Policy. Contact credits are available during your membership validity. Previously unlocked contacts remain subject to member privacy settings.
               </p>
             </div>
 

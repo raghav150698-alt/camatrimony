@@ -1300,7 +1300,7 @@ export default function ProfileWizard() {
                         <img
                           src={absMedia(photo) || photo}
                           alt={`Uploaded profile photo ${pIdx + 1}`}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                         <button
                           type="button"
@@ -1348,7 +1348,7 @@ export default function ProfileWizard() {
                               <img
                                 src={absMedia(formData.govtIdFile) || formData.govtIdFile}
                                 alt="Government ID preview"
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                               />
                             ) : (
                               <div className="flex flex-col items-center gap-1 text-maroon-500 px-2 text-center">
@@ -1383,7 +1383,7 @@ export default function ProfileWizard() {
                               <img
                                 src={absMedia(formData.degreeFile) || formData.degreeFile}
                                 alt="Degree certificate preview"
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                               />
                             ) : (
                               <div className="flex flex-col items-center gap-1 text-maroon-500 px-2 text-center">
@@ -1418,7 +1418,7 @@ export default function ProfileWizard() {
                               key={`preview-photo-${pIdx}`}
                               src={absMedia(photo) || photo}
                               alt={`Profile photo ${pIdx + 1}`}
-                              className="w-14 h-14 rounded-lg object-cover border border-emerald-500/30"
+                              className="w-14 h-14 rounded-lg object-contain border border-emerald-500/30"
                             />
                           ))}
                           {!pendingUploadField &&

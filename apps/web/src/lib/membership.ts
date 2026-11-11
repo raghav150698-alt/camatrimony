@@ -1,1 +1,1 @@
-export const SUBSCRIPTION_EMAIL = "support@camatrimonybncn.com";
+export const SUBSCRIPTION_EMAIL = "admin@camatrimonybncn.com";

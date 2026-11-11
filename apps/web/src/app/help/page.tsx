@@ -6,7 +6,7 @@ const questions = [
  ["How are profiles verified?", "The team reviews submitted government ID and education documents. A verified badge appears after approval; uploading a file alone does not mean it is verified."],
  ["How are matches ranked?", "Recommendations compare profiles against your saved age, community, education and minimum annual income preferences. Open preferences do not reduce a score. Expand ‘Why this match’ to see the factors."],
  ["When can I message someone?", "Messaging becomes available after an accepted interest or a qualifying contact unlock. Blocking prevents further messaging."],
- ["What does membership include?", "Plans offer a stated number of contact unlocks over a stated duration. See the membership page for current options. For subscriptions, email support@camatrimonybncn.com."],
+ ["What does membership include?", "Plans offer a stated number of contact unlocks over a stated duration. See the membership page for current options. For subscriptions, email admin@camatrimonybncn.com."],
  ["How do I change my preferences?", "Edit Your preferences on the Discover page, or open Partner preferences in your profile editor. Save your changes to update recommendations."],
  ["I can’t sign in. What should I do?", "Use the same Google account or mobile number you registered with. No password is required. If an OTP expires, request a new one. Contact support if you’re still unable to sign in."],
  ["How do I report or block someone?", "Open their profile and choose Report profile or Block profile. You can manage blocked profiles in Settings."],

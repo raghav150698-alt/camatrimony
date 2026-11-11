@@ -195,14 +195,14 @@ await check('contact subscriptions hide checkout details and reject new payment 
   env.SUBSCRIPTION_MODE='contact';
   try {
     const settings=await req('/payments/settings','GET',undefined,'');
-    assert.equal(settings.body.subscriptionEmail,'support@camatrimonybncn.com');
+    assert.equal(settings.body.subscriptionEmail,'admin@camatrimonybncn.com');
     assert.equal(settings.body.razorpayEnabled,false);
     assert.equal(settings.body.manualPaymentEnabled,false);
     assert.equal(settings.body.bankAccountDetails,'');
     for(const route of ['/payments/create-order','/payments/manual-proof']) {
       const result=await req(route,'POST',{packageId:Number(pkg),proofUrl:'unused'});
       assert.equal(result.status,403);
-      assert.match(result.body.error,/email support@camatrimonybncn.com/);
+      assert.match(result.body.error,/email admin@camatrimonybncn.com/);
     }
     assert.equal((await req('/payments/subscription')).status,200);
     assert.equal((await req('/payments/credits')).status,200);
