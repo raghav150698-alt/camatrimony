@@ -23,11 +23,13 @@ test('password setup rejects wrong origin, unknown path, CSRF and invalid passwo
   try {
     const page=await fetch(setup.url);const html=await page.text();
     assert.equal(page.headers.get('cache-control'),'no-store');
+    assert.equal(page.headers.get('referrer-policy'),'same-origin');
     assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
     const csrf=html.match(/name="csrf" value="([^"]+)"/)[1];
     assert.equal((await fetch(origin+'/unknown')).status,404);
     const post=(fields,from=origin)=>fetch(setup.url,{method:'POST',headers:{Origin:from,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(fields)});
     assert.equal((await post({csrf,password,confirmation:password},'https://untrusted.example')).status,403);
+    assert.equal((await post({csrf,password,confirmation:password},'null')).status,403);
     assert.equal((await post({csrf:'incorrect',password,confirmation:password})).status,403);
     assert.equal((await post({csrf,password:'short',confirmation:'short'})).status,400);
     assert.equal((await post({csrf,password,confirmation:'Mismatch fixture'})).status,400);
