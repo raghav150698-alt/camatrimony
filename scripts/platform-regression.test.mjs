@@ -243,4 +243,13 @@ await check('matches show member-visible photos before contact unlock without ex
   const member=result.body.profiles.find(p=>p.userId==='target2');assert.ok(member);assert.equal(member.photos.length,1);
   for(const key of ['address','email','phone','phoneNumber','govtIdFile','degreeFile','paymentProofUrl'])assert.ok(!(key in member),key+' must not appear in matches');
 });
+await check('admin password changes revoke only that account sessions in the same transaction',async()=>{
+  sql.exec("INSERT INTO admin_accounts(id,username,password_hash,role,is_active) VALUES('other-admin','other-admin','fixture','moderator',1)");
+  sql.exec("INSERT INTO admin_sessions(id,admin_id,token_hash,expires_at) VALUES('reset-test','admin-fixture','fixture-hash-one',datetime('now','+1 day')),('other-test','other-admin','fixture-hash-two',datetime('now','+1 day'))");
+  sql.exec("UPDATE admin_accounts SET display_name='New display name' WHERE id='admin-fixture'");
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM admin_sessions WHERE admin_id='admin-fixture'").get().n,1);
+  sql.exec("UPDATE admin_accounts SET password_hash='changed-fixture-hash' WHERE id='admin-fixture'");
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM admin_sessions WHERE admin_id='admin-fixture'").get().n,0);
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM admin_sessions WHERE admin_id='other-admin'").get().n,1);
+});
 console.log(`Completed ${count} integration regressions against an isolated SQLite database.`);
