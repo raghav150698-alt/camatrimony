@@ -11,8 +11,9 @@ const info=JSON.parse(readFileSync(packageFile,'utf8'));
 const bin=resolve(dirname(packageFile),typeof info.bin==='string'?info.bin:info.bin.wrangler);
 async function d1(args){
   const result=await new Promise((resolve,reject)=>{
-    const child=spawn(process.execPath,[bin,'d1','execute','camatrimony-db','--remote','--json',...args],{
+    const child=spawn(process.execPath,[bin,'d1','execute','camatrimony-db','--remote','--json','--yes',...args],{
       cwd:root+'/apps/api',env:{...process.env,CLOUDFLARE_ACCOUNT_ID:'54f28bd08ed537166f17438a317ed550',WRANGLER_SEND_METRICS:'false'},windowsHide:true});
+    child.stdin.end();
     let stdout='';child.stdout.on('data',data=>{stdout+=data;});child.stderr.on('data',()=>{});
     child.on('error',reject);child.on('exit',code=>code===0?resolve(stdout):reject(new Error('Cloudflare update failed')));
   });
@@ -29,8 +30,11 @@ const setup=await startAdminPasswordSetup({
     const file=resolve(privateDir,`admin-password-${randomUUID()}.sql`);
     try {
       // Only a salted PBKDF2 hash goes to Cloudflare. Plaintext is never written or logged.
-      writeFileSync(file,`UPDATE admin_accounts SET password_hash='${hash}' WHERE ${account};\nSELECT COUNT(*) AS updated FROM admin_accounts WHERE ${account} AND password_hash='${hash}';\n`,{mode:0o600});
-      const result=await d1(['--file',file]);
+      writeFileSync(file,`UPDATE admin_accounts SET password_hash='${hash}' WHERE ${account};\n`,{mode:0o600});
+      await d1(['--file',file]);
+      // D1 file imports return import statistics, not SELECT rows. Confirm with
+      // a separate read-only query; never request the stored hash itself.
+      const result=await d1(['--command',`SELECT COUNT(*) AS updated FROM admin_accounts WHERE ${account} AND password_hash='${hash}';`]);
       if(!result.some(item=>item.results?.some(row=>row.updated===1)))throw new Error('Admin password update not confirmed');
     } finally {try{unlinkSync(file);}catch{}}
   },
